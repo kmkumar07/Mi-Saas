@@ -131,6 +131,9 @@ export class PlanResponseDto {
   @ApiProperty({ example: 'Premium Plan' })
   name: string;
 
+  @ApiProperty({ example: 'PREMIUM_PLAN', description: 'Plan code for versioning (groups plan versions)' })
+  planCode: string;
+
   @ApiProperty({ enum: PlanType, example: PlanType.PRO })
   planType: PlanType;
 
@@ -148,6 +151,13 @@ export class PlanResponseDto {
 
   @ApiProperty({ example: true })
   active: boolean;
+
+  @ApiProperty({ 
+    enum: ['active', 'archived', 'draft'], 
+    example: 'active',
+    description: 'Plan status: active (available for new subscriptions), archived (no longer available), draft (not yet published)'
+  })
+  status: 'active' | 'archived' | 'draft';
 
   @ApiPropertyOptional({ example: { customField: 'value' } })
   metadata?: Record<string, any>;

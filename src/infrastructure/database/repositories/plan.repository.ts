@@ -26,8 +26,10 @@ export class PlanRepository implements IPlanRepository {
             .values({
                 tenantId: plan.tenantId,
                 name: plan.name,
+                planCode: plan.planCode,
                 planType: plan.planType,
                 active: plan.active,
+                status: plan.status,
                 metadata: plan.metadata,
             })
             .returning();
@@ -152,8 +154,10 @@ export class PlanRepository implements IPlanRepository {
             .update(schema.plans)
             .set({
                 name: plan.name,
+                planCode: plan.planCode,
                 planType: plan.planType,
                 active: plan.active,
+                status: plan.status,
                 metadata: plan.metadata,
             })
             .where(eq(schema.plans.id, plan.id));
@@ -175,6 +179,80 @@ export class PlanRepository implements IPlanRepository {
                     description: plan.price.description,
                 })
                 .where(eq(schema.prices.id, priceResult[0].id));
+
+            // Update recurring charge period
+            if (plan.price.recurringChargePeriod) {
+                await this.db
+                    .update(schema.recurringChargePeriods)
+                    .set({
+                        chargeFrequency: plan.price.recurringChargePeriod.chargeFrequency,
+                        startDateTime: plan.price.recurringChargePeriod.startDateTime,
+                        numberOfPeriods: plan.price.recurringChargePeriod.numberOfPeriods,
+                    })
+                    .where(eq(schema.recurringChargePeriods.priceId, priceResult[0].id));
+            }
+        }
+
+        // Update or Insert Renewal Definition
+        if (plan.renewalDefinition) {
+            const existingRenewal = await this.db
+                .select()
+                .from(schema.renewalDefinitions)
+                .where(eq(schema.renewalDefinitions.planId, plan.id))
+                .limit(1);
+
+            if (existingRenewal.length > 0) {
+                // Update
+                await this.db
+                    .update(schema.renewalDefinitions)
+                    .set({
+                        isExpirable: plan.renewalDefinition.isExpirable,
+                        isAutomaticRenewable: plan.renewalDefinition.isAutomaticRenewable,
+                        renewCycleUnits: plan.renewalDefinition.renewCycleUnits,
+                        gracePeriodName: plan.renewalDefinition.gracePeriod.name,
+                        gracePeriodValue: plan.renewalDefinition.gracePeriod.value,
+                        maxRenewCycles: plan.renewalDefinition.maxRenewCycles,
+                    })
+                    .where(eq(schema.renewalDefinitions.id, existingRenewal[0].id));
+            } else {
+                // Insert
+                await this.db.insert(schema.renewalDefinitions).values({
+                    planId: plan.id,
+                    isExpirable: plan.renewalDefinition.isExpirable,
+                    isAutomaticRenewable: plan.renewalDefinition.isAutomaticRenewable,
+                    renewCycleUnits: plan.renewalDefinition.renewCycleUnits,
+                    gracePeriodName: plan.renewalDefinition.gracePeriod.name,
+                    gracePeriodValue: plan.renewalDefinition.gracePeriod.value,
+                    maxRenewCycles: plan.renewalDefinition.maxRenewCycles,
+                });
+            }
+        }
+
+        // Update or Insert Trial Period
+        if (plan.trialPeriod) {
+            const existingTrial = await this.db
+                .select()
+                .from(schema.trialPeriods)
+                .where(eq(schema.trialPeriods.planId, plan.id))
+                .limit(1);
+
+            if (existingTrial.length > 0) {
+                // Update
+                await this.db
+                    .update(schema.trialPeriods)
+                    .set({
+                        name: plan.trialPeriod.name,
+                        value: plan.trialPeriod.value,
+                    })
+                    .where(eq(schema.trialPeriods.id, existingTrial[0].id));
+            } else {
+                // Insert
+                await this.db.insert(schema.trialPeriods).values({
+                    planId: plan.id,
+                    name: plan.trialPeriod.name,
+                    value: plan.trialPeriod.value,
+                });
+            }
         }
 
         const updatedPlan = await this.findById(plan.id);
@@ -278,12 +356,14 @@ export class PlanRepository implements IPlanRepository {
             id: row.id,
             tenantId: row.tenantId,
             name: row.name,
+            planCode: row.planCode,
             planType: row.planType as any,
             productIds,
             price,
             renewalDefinition,
             trialPeriod,
             active: row.active,
+            status: row.status as any,
             metadata: row.metadata as Record<string, any>,
             createdAt: row.createdAt,
         });

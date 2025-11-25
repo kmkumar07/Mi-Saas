@@ -179,14 +179,22 @@ export const features = pgTable('features', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const planStatusEnum = pgEnum('plan_status', [
+    'active',
+    'archived',
+    'draft',
+]);
+
 export const plans = pgTable('plans', {
     id: uuid('id').primaryKey().defaultRandom(),
     tenantId: uuid('tenant_id')
         .references(() => tenants.id, { onDelete: 'cascade' })
         .notNull(),
     name: text('name').notNull(),
+    planCode: text('plan_code').notNull(), // Grouping identifier for versioning (e.g., 'PRO_PLAN')
     planType: planTypeEnum('plan_type').notNull(),
-    active: boolean('active').default(true).notNull(),
+    status: planStatusEnum('status').default('active').notNull(),
+    active: boolean('active').default(true).notNull(), // Deprecated, use status instead
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });

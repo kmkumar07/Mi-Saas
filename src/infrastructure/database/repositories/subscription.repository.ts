@@ -71,6 +71,20 @@ export class SubscriptionRepository implements ISubscriptionRepository {
         return results.map(r => this.toDomain(r));
     }
 
+    async findActiveByPlanId(planId: string): Promise<Subscription[]> {
+        const results = await this.db
+            .select()
+            .from(subscriptions)
+            .where(
+                and(
+                    eq(subscriptions.planId, planId),
+                    eq(subscriptions.status, 'active')
+                )
+            );
+
+        return results.map(r => this.toDomain(r));
+    }
+
     async update(subscription: Subscription): Promise<Subscription> {
         const [result] = await this.db
             .update(subscriptions)

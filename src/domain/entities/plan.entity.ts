@@ -6,12 +6,14 @@ export interface PlanProps {
     id?: string;
     tenantId: string;
     name: string;
+    planCode?: string;
     planType: PlanType;
     productIds: string[]; // Array of product IDs associated with this plan
     price: Price;
     renewalDefinition?: RenewalDefinition;
     trialPeriod?: TimePeriod;
     active?: boolean;
+    status?: 'active' | 'archived' | 'draft';
     metadata?: Record<string, any>;
     createdAt?: Date;
 }
@@ -20,26 +22,30 @@ export class Plan {
     private readonly _id: string;
     private readonly _tenantId: string;
     private _name: string;
+    private _planCode: string;
     private _planType: PlanType;
     private _productIds: string[];
     private _price: Price;
     private _renewalDefinition?: RenewalDefinition;
     private _trialPeriod?: TimePeriod;
     private _active: boolean;
+    private _status: 'active' | 'archived' | 'draft';
     private _metadata?: Record<string, any>;
     private readonly _createdAt: Date;
 
     constructor(props: PlanProps) {
         this.validate(props);
-        this._id = props.id || randomUUID(); // Generate UUID if not provided
+        this._id = props.id || randomUUID();
         this._tenantId = props.tenantId;
         this._name = props.name;
+        this._planCode = props.planCode || this.generatePlanCode(props.name);
         this._planType = props.planType;
         this._productIds = props.productIds;
         this._price = props.price;
         this._renewalDefinition = props.renewalDefinition;
         this._trialPeriod = props.trialPeriod;
         this._active = props.active ?? true;
+        this._status = props.status || 'active';
         this._metadata = props.metadata;
         this._createdAt = props.createdAt ?? new Date();
     }
@@ -66,105 +72,85 @@ export class Plan {
         }
     }
 
+    private generatePlanCode(name: string): string {
+        return name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+    }
+
     // Getters
-    get id(): string {
-        return this._id;
-    }
-
-    get tenantId(): string {
-        return this._tenantId;
-    }
-
-    get name(): string {
-        return this._name;
-    }
-
-    get planType(): PlanType {
-        return this._planType;
-    }
-
-    get productIds(): string[] {
-        return [...this._productIds];
-    }
-
-    get price(): Price {
-        return this._price;
-    }
-
-    get renewalDefinition(): RenewalDefinition | undefined {
-        return this._renewalDefinition;
-    }
-
-    get trialPeriod(): TimePeriod | undefined {
-        return this._trialPeriod;
-    }
-
-    get active(): boolean {
-        return this._active;
-    }
-
-    get metadata(): Record<string, any> | undefined {
-        return this._metadata;
-    }
-
-    get createdAt(): Date {
-        return this._createdAt;
-    }
+    get id(): string { return this._id; }
+    get tenantId(): string { return this._tenantId; }
+    get name(): string { return this._name; }
+    get planCode(): string { return this._planCode; }
+    get planType(): PlanType { return this._planType; }
+    get productIds(): string[] { return [...this._productIds]; }
+    get price(): Price { return this._price; }
+    get renewalDefinition(): RenewalDefinition | undefined { return this._renewalDefinition; }
+    get trialPeriod(): TimePeriod | undefined { return this._trialPeriod; }
+    get active(): boolean { return this._active; }
+    get status(): 'active' | 'archived' | 'draft' { return this._status; }
+    get metadata(): Record<string, any> | undefined { return this._metadata; }
+    get createdAt(): Date { return this._createdAt; }
 
     // Business methods
-    updatePrice(newPrice: Price): void {
-        this._price = newPrice;
+
+    /**
+     * Creates a new version of this plan.
+     * The current plan instance should be archived after calling this.
+     */
+    createNewVersion(changes: Partial<PlanProps>): Plan {
+        // Create new plan with same planCode but new ID
+        return new Plan({
+            ...this.toProps(),
+            ...changes,
+            id: undefined, // Will generate new ID
+            planCode: this._planCode, // Keep same plan code
+            status: 'active',
+            createdAt: new Date(),
+        });
     }
 
-    updateName(newName: string): void {
-        if (!newName || newName.trim() === '') {
-            throw new Error('Plan name cannot be empty');
-        }
-        this._name = newName;
-    }
-
-    activate(): void {
-        this._active = true;
-    }
-
-    deactivate(): void {
+    archive(): void {
+        this._status = 'archived';
         this._active = false;
     }
 
-    updatePlanType(type: PlanType): void {
-        this._planType = type;
+    toProps(): PlanProps {
+        return {
+            id: this._id,
+            tenantId: this._tenantId,
+            name: this._name,
+            planCode: this._planCode,
+            planType: this._planType,
+            productIds: this._productIds,
+            price: this._price,
+            renewalDefinition: this._renewalDefinition,
+            trialPeriod: this._trialPeriod,
+            active: this._active,
+            status: this._status,
+            metadata: this._metadata,
+            createdAt: this._createdAt,
+        };
     }
 
-    updateMetadata(metadata: Record<string, any>): void {
-        this._metadata = { ...this._metadata, ...metadata };
+    // Legacy methods
+    updatePrice(newPrice: Price): void { this._price = newPrice; }
+    updateName(newName: string): void {
+        if (!newName || newName.trim() === '') throw new Error('Plan name cannot be empty');
+        this._name = newName;
     }
-
+    activate(): void { this._active = true; this._status = 'active'; }
+    deactivate(): void { this._active = false; this._status = 'archived'; }
+    updatePlanType(type: PlanType): void { this._planType = type; }
+    updateMetadata(metadata: Record<string, any>): void { this._metadata = { ...this._metadata, ...metadata }; }
     addProduct(productId: string): void {
-        if (!this._productIds.includes(productId)) {
-            this._productIds.push(productId);
-        }
+        if (!this._productIds.includes(productId)) this._productIds.push(productId);
     }
-
     removeProduct(productId: string): void {
         this._productIds = this._productIds.filter(id => id !== productId);
-        if (this._productIds.length === 0) {
-            throw new Error('Plan must have at least one product');
-        }
+        if (this._productIds.length === 0) throw new Error('Plan must have at least one product');
     }
-
-    updateRenewalDefinition(renewalDefinition: RenewalDefinition): void {
-        this._renewalDefinition = renewalDefinition;
-    }
-
-    updateTrialPeriod(trialPeriod: TimePeriod): void {
-        this._trialPeriod = trialPeriod;
-    }
-
-    hasTrialPeriod(): boolean {
-        return this._trialPeriod !== undefined;
-    }
-
-    hasRenewalDefinition(): boolean {
-        return this._renewalDefinition !== undefined;
-    }
+    updateRenewalDefinition(renewalDefinition: RenewalDefinition): void { this._renewalDefinition = renewalDefinition; }
+    updateTrialPeriod(trialPeriod: TimePeriod): void { this._trialPeriod = trialPeriod; }
+    hasTrialPeriod(): boolean { return this._trialPeriod !== undefined; }
+    hasRenewalDefinition(): boolean { return this._renewalDefinition !== undefined; }
 }
