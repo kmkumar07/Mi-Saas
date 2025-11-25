@@ -12,7 +12,7 @@ import {
 import { PlanResponseDto } from '../../dtos/plan-response.dto';
 import { UpdatePlanDto } from '../../dtos/update-plan.dto';
 import { PlanResponseMapper } from '@application/mappers/plan-response.mapper';
-import { Plan } from '@domain/entities';
+import { Plan, PlanFamily, PlanProps } from '@domain/entities';
 import { Price, RecurringChargePeriod, RenewalDefinition, TimePeriod } from '@domain/value-objects';
 import { PlanPersistenceService } from '@infrastructure/persistence/plan-persistence.service';
 import { Product, Feature } from '@domain/entities';
@@ -39,140 +39,66 @@ export class UpdatePlanUseCase {
             throw new NotFoundException(`Plan with ID ${planId} not found`);
         }
 
-        // Step 2: Check if plan has active subscriptions
+        // Step 2: Check if plan has active subscriptions (infrastructure concern - querying)
         const activeSubscriptions = await this.subscriptionRepository.findActiveByPlanId(planId);
         const hasActiveSubscriptions = activeSubscriptions.length > 0;
 
-        let updatedPlan: Plan;
+        // Step 3: Construct aggregate root for plan family
+        const planFamily = PlanFamily.fromPlans([existingPlan]);
+
+        // Step 4: Convert DTO to domain changes
+        const changes = await this.convertDtoToPlanProps(updateDto, existingPlan);
+
+        // Step 5: Apply updates using aggregate root (business logic)
+        const { originalPlan, updatedPlan } = planFamily.updateLatestPlan(
+            changes,
+            hasActiveSubscriptions,
+        );
+
+        // Step 6: Handle products and features (application orchestration)
         let products: Product[] = [];
         let productFeatures: Map<string, Feature[]> = new Map();
+        let finalPlan: Plan = updatedPlan;
 
-        if (hasActiveSubscriptions) {
-            // Step 3a: Plan has active subscriptions - archive old and create new version
-            existingPlan.archive();
-            await this.planRepository.update(existingPlan);
-
-            // Create new version with changes
-            const changes = await this.convertDtoToPlanProps(updateDto, existingPlan);
-            updatedPlan = existingPlan.createNewVersion(changes);
-
-            // If products are being updated, we need to handle them
-            if (updateDto.products) {
-                // Create or update products and features
-                for (const productDto of updateDto.products) {
-                    let product: Product;
-                    
-                    // Check if product already exists (by name or create new)
-                    // For simplicity, we'll create new products for the new plan version
-                    product = new Product({
-                        tenantId: existingPlan.tenantId,
-                        name: productDto.name,
-                        description: productDto.description,
-                    });
-                    products.push(product);
-
-                    // Create features for this product
-                    const features: Feature[] = [];
-                    for (const featureDto of productDto.features) {
-                        const feature = new Feature({
-                            productId: product.id,
-                            name: featureDto.name,
-                            code: featureDto.code,
-                            description: featureDto.description,
-                            featureType: featureDto.featureType,
-                            chargeModel: featureDto.chargeModel,
-                            serviceUrl: featureDto.serviceUrl,
-                        });
-                        features.push(feature);
-                    }
-                    productFeatures.set(product.id, features);
-                }
-                updatedPlan = new Plan({
-                    ...updatedPlan.toProps(),
-                    productIds: products.map(p => p.id),
+        if (updateDto.products) {
+            // Create new products and features for the updated plan
+            for (const productDto of updateDto.products) {
+                const product = new Product({
+                    tenantId: existingPlan.tenantId,
+                    name: productDto.name,
+                    description: productDto.description,
                 });
-            } else {
-                // Use existing products
-                products = await Promise.all(
-                    existingPlan.productIds.map(async (productId) => {
-                        const product = await this.productRepository.findById(productId);
-                        if (!product) {
-                            throw new Error(`Product ${productId} not found`);
-                        }
-                        return product;
-                    })
-                );
+                products.push(product);
 
-                for (const product of products) {
-                    const features = await this.featureRepository.findByProductId(product.id!);
-                    productFeatures.set(product.id!, features);
+                const features: Feature[] = [];
+                for (const featureDto of productDto.features) {
+                    const feature = new Feature({
+                        productId: product.id,
+                        name: featureDto.name,
+                        code: featureDto.code,
+                        description: featureDto.description,
+                        featureType: featureDto.featureType,
+                        chargeModel: featureDto.chargeModel,
+                        serviceUrl: featureDto.serviceUrl,
+                    });
+                    features.push(feature);
                 }
+                productFeatures.set(product.id, features);
             }
 
-            // Persist the new version
-            const saved = await this.planPersistenceService.savePlanAggregate(
-                updatedPlan,
-                products,
-                productFeatures,
-            );
-            updatedPlan = saved.plan;
-            products = saved.products;
-            productFeatures = saved.productFeatures;
+            // Create a new plan instance with the updated product IDs
+            finalPlan = new Plan({
+                ...updatedPlan.toProps(),
+                productIds: products.map(p => p.id),
+            });
         } else {
-            // Step 3b: No active subscriptions - update directly
-            const changes = await this.convertDtoToPlanProps(updateDto, existingPlan);
-            
-            // Apply changes to existing plan
-            if (changes.name !== undefined) {
-                existingPlan.updateName(changes.name);
-            }
-            if (changes.planType !== undefined) {
-                existingPlan.updatePlanType(changes.planType);
-            }
-            if (changes.price !== undefined) {
-                existingPlan.updatePrice(changes.price);
-            }
-            if (changes.renewalDefinition !== undefined) {
-                existingPlan.updateRenewalDefinition(changes.renewalDefinition);
-            }
-            if (changes.trialPeriod !== undefined) {
-                existingPlan.updateTrialPeriod(changes.trialPeriod);
-            }
-            if (changes.metadata !== undefined) {
-                existingPlan.updateMetadata(changes.metadata);
-            }
-            if (changes.productIds !== undefined) {
-                // Handle product updates
-                const currentProductIds = existingPlan.productIds;
-                const newProductIds = changes.productIds;
+            // Use existing products
+            const productIds = hasActiveSubscriptions
+                ? updatedPlan.productIds
+                : originalPlan.productIds;
 
-                // Remove products that are no longer in the list
-                for (const productId of currentProductIds) {
-                    if (!newProductIds.includes(productId)) {
-                        existingPlan.removeProduct(productId);
-                    }
-                }
-
-                // Add new products
-                for (const productId of newProductIds) {
-                    if (!currentProductIds.includes(productId)) {
-                        existingPlan.addProduct(productId);
-                    }
-                }
-            }
-
-            // If products are being updated via DTO
-            if (updateDto.products) {
-                // This is more complex - we'd need to create/update products
-                // For now, we'll update the plan and let the persistence layer handle it
-                // This is a simplified approach - in production you might want more sophisticated product management
-            }
-
-            updatedPlan = await this.planRepository.update(existingPlan);
-
-            // Fetch products and features for response
             products = await Promise.all(
-                updatedPlan.productIds.map(async (productId) => {
+                productIds.map(async (productId) => {
                     const product = await this.productRepository.findById(productId);
                     if (!product) {
                         throw new Error(`Product ${productId} not found`);
@@ -187,9 +113,42 @@ export class UpdatePlanUseCase {
             }
         }
 
-        // Step 4: Map to response DTO
+        // Step 7: Persist changes (infrastructure concern)
+        let savedPlan: Plan;
+        if (hasActiveSubscriptions) {
+            // Save archived original plan
+            await this.planRepository.update(originalPlan);
+
+            // Save new version with products and features
+            const saved = await this.planPersistenceService.savePlanAggregate(
+                finalPlan,
+                products,
+                productFeatures,
+            );
+            savedPlan = saved.plan;
+            products = saved.products;
+            productFeatures = saved.productFeatures;
+        } else {
+            // Update existing plan directly
+            if (updateDto.products) {
+                // If products are being updated, use persistence service to save everything
+                const saved = await this.planPersistenceService.savePlanAggregate(
+                    finalPlan,
+                    products,
+                    productFeatures,
+                );
+                savedPlan = saved.plan;
+                products = saved.products;
+                productFeatures = saved.productFeatures;
+            } else {
+                // No product changes, just update the plan
+                savedPlan = await this.planRepository.update(finalPlan);
+            }
+        }
+
+        // Step 8: Map to response DTO
         return this.planResponseMapper.toResponseDto(
-            updatedPlan,
+            savedPlan,
             products,
             productFeatures,
         );
@@ -201,8 +160,8 @@ export class UpdatePlanUseCase {
     private async convertDtoToPlanProps(
         dto: UpdatePlanDto,
         existingPlan: Plan,
-    ): Promise<Partial<Plan['toProps']>> {
-        const changes: Partial<Plan['toProps']> = {};
+    ): Promise<Partial<PlanProps>> {
+        const changes: Partial<PlanProps> = {};
 
         if (dto.name !== undefined) {
             changes.name = dto.name;

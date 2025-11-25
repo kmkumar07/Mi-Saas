@@ -3,8 +3,7 @@ import { CreatePlanDto } from '../../dtos/create-plan.dto';
 import { PlanResponseDto } from '../../dtos/plan-response.dto';
 import { PlanResponseMapper } from '@application/mappers/plan-response.mapper';
 import { PlanPersistenceService } from '@infrastructure/persistence/plan-persistence.service';
-import { Product, Feature, Plan } from '@domain/entities';
-import { FeatureType } from '@domain/enums/feature-type.enum';
+import { Product, Feature, Plan, PlanFamily } from '@domain/entities';
 import { Price } from '@domain/value-objects/price.vo';
 import { RecurringChargePeriod } from '@domain/value-objects/recurring-charge-period.vo';
 import { RenewalDefinition } from '@domain/value-objects/renewal-definition.vo';
@@ -120,8 +119,8 @@ export class CreatePlanUseCase {
             );
         }
 
-        // Create plan
-        return new Plan({
+        // Create plan family with initial version-1 plan
+        const family = PlanFamily.createInitialPlan({
             tenantId: dto.tenantId,
             name: dto.name,
             planType: dto.planType,
@@ -131,5 +130,7 @@ export class CreatePlanUseCase {
             trialPeriod,
             metadata: dto.metadata,
         });
+
+        return family.latestPlan;
     }
 }

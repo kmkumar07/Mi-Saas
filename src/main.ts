@@ -26,6 +26,7 @@ async function bootstrap() {
         .addTag('plans', 'Plan management endpoints')
         .addTag('products', 'Product management endpoints')
         .addTag('features', 'Feature management endpoints')
+        .addTag('subscriptions', 'Subscription management endpoints')
         .build();
 
     const document = SwaggerModule.createDocument(app, config);

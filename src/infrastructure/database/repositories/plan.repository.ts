@@ -28,6 +28,7 @@ export class PlanRepository implements IPlanRepository {
                 name: plan.name,
                 planCode: plan.planCode,
                 planType: plan.planType,
+                version: plan.version,
                 active: plan.active,
                 status: plan.status,
                 metadata: plan.metadata,
@@ -156,6 +157,7 @@ export class PlanRepository implements IPlanRepository {
                 name: plan.name,
                 planCode: plan.planCode,
                 planType: plan.planType,
+                version: plan.version,
                 active: plan.active,
                 status: plan.status,
                 metadata: plan.metadata,
@@ -366,6 +368,7 @@ export class PlanRepository implements IPlanRepository {
             status: row.status as any,
             metadata: row.metadata as Record<string, any>,
             createdAt: row.createdAt,
+            version: (row as any).version ?? 1,
         });
     }
 }

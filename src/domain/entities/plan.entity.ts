@@ -16,6 +16,11 @@ export interface PlanProps {
     status?: 'active' | 'archived' | 'draft';
     metadata?: Record<string, any>;
     createdAt?: Date;
+    /**
+     * Explicit version number for the plan within its family.
+     * Starts at 1 for the initial version and increments for each new version.
+     */
+    version?: number;
 }
 
 export class Plan {
@@ -32,6 +37,7 @@ export class Plan {
     private _status: 'active' | 'archived' | 'draft';
     private _metadata?: Record<string, any>;
     private readonly _createdAt: Date;
+    private readonly _version: number;
 
     constructor(props: PlanProps) {
         this.validate(props);
@@ -48,6 +54,7 @@ export class Plan {
         this._status = props.status || 'active';
         this._metadata = props.metadata;
         this._createdAt = props.createdAt ?? new Date();
+        this._version = props.version ?? 1;
     }
 
     private validate(props: PlanProps): void {
@@ -90,6 +97,7 @@ export class Plan {
     get status(): 'active' | 'archived' | 'draft' { return this._status; }
     get metadata(): Record<string, any> | undefined { return this._metadata; }
     get createdAt(): Date { return this._createdAt; }
+    get version(): number { return this._version; }
 
     // Business methods
 
@@ -106,6 +114,7 @@ export class Plan {
             planCode: this._planCode, // Keep same plan code
             status: 'active',
             createdAt: new Date(),
+            version: this._version + 1,
         });
     }
 
@@ -129,10 +138,11 @@ export class Plan {
             status: this._status,
             metadata: this._metadata,
             createdAt: this._createdAt,
+            version: this._version,
         };
     }
 
-    // Legacy methods
+    // Legacy / mutation methods
     updatePrice(newPrice: Price): void { this._price = newPrice; }
     updateName(newName: string): void {
         if (!newName || newName.trim() === '') throw new Error('Plan name cannot be empty');
@@ -153,4 +163,47 @@ export class Plan {
     updateTrialPeriod(trialPeriod: TimePeriod): void { this._trialPeriod = trialPeriod; }
     hasTrialPeriod(): boolean { return this._trialPeriod !== undefined; }
     hasRenewalDefinition(): boolean { return this._renewalDefinition !== undefined; }
+
+    /**
+     * Applies updates directly to this plan instance.
+     * This encapsulates the in-place mutation logic that was previously in the domain service.
+     */
+    applyDirectUpdates(changes: Partial<PlanProps>): void {
+        if (changes.name !== undefined) {
+            this.updateName(changes.name);
+        }
+        if (changes.planType !== undefined) {
+            this.updatePlanType(changes.planType);
+        }
+        if (changes.price !== undefined) {
+            this.updatePrice(changes.price);
+        }
+        if (changes.renewalDefinition !== undefined) {
+            this.updateRenewalDefinition(changes.renewalDefinition);
+        }
+        if (changes.trialPeriod !== undefined) {
+            this.updateTrialPeriod(changes.trialPeriod);
+        }
+        if (changes.metadata !== undefined) {
+            this.updateMetadata(changes.metadata);
+        }
+        if (changes.productIds !== undefined) {
+            const currentProductIds = [...this._productIds];
+            const newProductIds = changes.productIds;
+
+            // Remove products that are no longer in the list
+            for (const productId of currentProductIds) {
+                if (!newProductIds.includes(productId)) {
+                    this.removeProduct(productId);
+                }
+            }
+
+            // Add new products
+            for (const productId of newProductIds) {
+                if (!currentProductIds.includes(productId)) {
+                    this.addProduct(productId);
+                }
+            }
+        }
+    }
 }

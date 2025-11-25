@@ -193,6 +193,7 @@ export const plans = pgTable('plans', {
     name: text('name').notNull(),
     planCode: text('plan_code').notNull(), // Grouping identifier for versioning (e.g., 'PRO_PLAN')
     planType: planTypeEnum('plan_type').notNull(),
+    version: integer('version').notNull().default(1),
     status: planStatusEnum('status').default('active').notNull(),
     active: boolean('active').default(true).notNull(), // Deprecated, use status instead
     metadata: jsonb('metadata'),
