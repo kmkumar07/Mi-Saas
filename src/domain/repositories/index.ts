@@ -3,3 +3,4 @@ export * from './product.repository.interface';
 export * from './feature.repository.interface';
 export * from './tenant.repository.interface';
 export * from './subscription.repository';
+export * from './plan-feature-config.repository';

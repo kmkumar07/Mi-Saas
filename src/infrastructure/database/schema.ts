@@ -58,15 +58,6 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
     'refunded',
 ]);
 
-export const pricingStrategyEnum = pgEnum('pricing_strategy', [
-    'static',
-    'metered',
-    'hybrid',
-    'usage_only',
-    'seat_based',
-    'feature_based',
-]);
-
 export const planTypeEnum = pgEnum('plan_type', [
     'free',
     'standard',
@@ -209,6 +200,37 @@ export const planProducts = pgTable('plan_products', {
     productId: uuid('product_id')
         .references(() => products.id, { onDelete: 'cascade' })
         .notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Per-plan feature configuration
+export const planFeatures = pgTable('plan_features', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    planId: uuid('plan_id')
+        .references(() => plans.id, { onDelete: 'cascade' })
+        .notNull(),
+    featureId: uuid('feature_id')
+        .references(() => features.id, { onDelete: 'cascade' })
+        .notNull(),
+    isActive: boolean('is_active').default(true).notNull(),
+    featureType: featureTypeEnum('feature_type').notNull(),
+    quotaLimit: integer('quota_limit'),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Tiered pricing for metered plan features
+export const featurePricingTiers = pgTable('feature_pricing_tiers', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    planFeatureId: uuid('plan_feature_id')
+        .references(() => planFeatures.id, { onDelete: 'cascade' })
+        .notNull(),
+    tierIndex: integer('tier_index').notNull(),
+    fromQuantity: integer('from_quantity').notNull(),
+    toQuantity: integer('to_quantity'),
+    pricePerUnit: bigint('price_per_unit', { mode: 'number' }).notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('USD'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -398,6 +420,12 @@ export type NewPlan = typeof plans.$inferInsert;
 
 export type PlanProduct = typeof planProducts.$inferSelect;
 export type NewPlanProduct = typeof planProducts.$inferInsert;
+
+export type PlanFeature = typeof planFeatures.$inferSelect;
+export type NewPlanFeature = typeof planFeatures.$inferInsert;
+
+export type FeaturePricingTier = typeof featurePricingTiers.$inferSelect;
+export type NewFeaturePricingTier = typeof featurePricingTiers.$inferInsert;
 
 export type Price = typeof prices.$inferSelect;
 export type NewPrice = typeof prices.$inferInsert;

@@ -1,5 +1,6 @@
 export * from './plan.entity';
 export * from './plan-family.entity';
+export * from './plan-feature-config.entity';
 export * from './product.entity';
 export * from './feature.entity';
 export * from './account.entity';

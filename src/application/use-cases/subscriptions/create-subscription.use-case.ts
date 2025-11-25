@@ -129,21 +129,30 @@ export class CreateSubscriptionUseCase {
             case 'weekly':
                 days = 7;
                 break;
+            case 'fortnightly':
+                days = 14;
+                break;
             case 'monthly':
                 days = 30;
                 break;
-            case 'quarterly':
-                days = 90;
+            case 'hourly':
+                days = 1 / 24; // Less than a day, will be handled by periods
                 break;
-            case 'yearly':
-                days = 365;
+            case 'per-minute':
+                days = 1 / (24 * 60);
+                break;
+            case 'per-second':
+                days = 1 / (24 * 60 * 60);
+                break;
+            case 'one-time':
+                days = 0; // One-time charges don't have a recurring period
                 break;
             default:
                 days = 30;
         }
 
         const periods = rcp.numberOfPeriods ?? 1;
-        const totalDays = days * periods;
+        const totalDays = Math.max(1, days * periods); // Ensure at least 1 day for recurring subscriptions
 
         const end = new Date(start.getTime() + totalDays * 24 * 60 * 60 * 1000);
 

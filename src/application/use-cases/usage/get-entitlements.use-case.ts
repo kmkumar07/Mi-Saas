@@ -4,7 +4,9 @@ import { IUsageEventRepository, USAGE_EVENT_REPOSITORY } from '../../../domain/r
 import { IPlanRepository, PLAN_REPOSITORY } from '@domain/repositories';
 import { IProductRepository, PRODUCT_REPOSITORY } from '@domain/repositories';
 import { IFeatureRepository, FEATURE_REPOSITORY } from '@domain/repositories';
-import { EntitlementsResponseDto, FeatureEntitlement, UsageInfo } from '../../dtos/usage.dto';
+import { IPlanFeatureConfigRepository, PLAN_FEATURE_CONFIG_REPOSITORY } from '@domain/repositories/plan-feature-config.repository';
+import { EntitlementsResponseDto, FeatureEntitlement, UsageInfo, FeaturePricingTierInfo } from '../../dtos/usage.dto';
+import { FeatureType } from '@domain/enums';
 
 @Injectable()
 export class GetEntitlementsUseCase {
@@ -19,6 +21,8 @@ export class GetEntitlementsUseCase {
         private readonly featureRepository: IFeatureRepository,
         @Inject(USAGE_EVENT_REPOSITORY)
         private readonly usageEventRepository: IUsageEventRepository,
+        @Inject(PLAN_FEATURE_CONFIG_REPOSITORY)
+        private readonly planFeatureConfigRepository: IPlanFeatureConfigRepository,
     ) { }
 
     async execute(tenantId: string, customerId?: string): Promise<EntitlementsResponseDto> {
@@ -63,6 +67,9 @@ export class GetEntitlementsUseCase {
             now
         );
 
+        // 5. Load per-plan feature configuration and pricing tiers
+        const planFeatureConfigs = await this.planFeatureConfigRepository.findByPlanIds(planIds);
+
         // 6. Build entitlements response
         const features: Record<string, FeatureEntitlement> = {};
         const usage: Record<string, UsageInfo> = {};
@@ -70,31 +77,48 @@ export class GetEntitlementsUseCase {
         for (const feature of allFeatures) {
             const featureCode = feature.code;
 
-            // Boolean features
-            if (feature.featureType === 'boolean') {
+            // Find configs for this feature across all active plans
+            const configsForFeature = planFeatureConfigs.filter(cfg => cfg.featureId === feature.id);
+            const anyActive = configsForFeature.some(cfg => cfg.isAvailable());
+
+            if (!anyActive) {
+                continue;
+            }
+
+            const primaryConfig = configsForFeature[0];
+
+            if (feature.featureType === FeatureType.BOOLEAN) {
                 features[featureCode] = {
                     enabled: true,
                 };
             }
 
-            // Quota features
-            if (feature.featureType === 'quota') {
-                const limit = feature.metadata?.max || feature.metadata?.limit;
+            if (feature.featureType === FeatureType.QUOTA) {
+                const limit = primaryConfig.quotaLimit;
                 features[featureCode] = {
                     enabled: true,
                     limit,
                 };
             }
 
-            // Metered features
-            if (feature.featureType === 'metered') {
+            if (feature.featureType === FeatureType.METERED) {
                 const usageData = aggregatedUsage.find(u => u.featureCode === featureCode);
                 const used = usageData?.totalQuantity || 0;
-                const limit = feature.metadata?.limit || feature.metadata?.max;
+
+                const pricingTiers: FeaturePricingTierInfo[] = primaryConfig.pricingTiers.map(tier => ({
+                    fromQuantity: tier.fromQuantity,
+                    toQuantity: tier.toQuantity ?? null,
+                    pricePerUnit: tier.pricePerUnit,
+                    currency: tier.currency,
+                }));
 
                 usage[featureCode] = {
                     used,
-                    limit,
+                };
+
+                features[featureCode] = {
+                    enabled: true,
+                    pricingTiers: pricingTiers.length > 0 ? pricingTiers : undefined,
                 };
             }
         }

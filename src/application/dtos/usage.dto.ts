@@ -19,9 +19,20 @@ export class RecordUsageDto {
     idempotencyKey?: string;
 }
 
+export interface FeaturePricingTierInfo {
+    fromQuantity: number;
+    toQuantity?: number | null;
+    pricePerUnit: number;
+    currency: string;
+}
+
 export interface FeatureEntitlement {
     enabled: boolean;
     limit?: number;
+    /**
+     * Tiered pricing information for metered features, if applicable.
+     */
+    pricingTiers?: FeaturePricingTierInfo[];
 }
 
 export interface UsageInfo {

@@ -7,8 +7,10 @@ import { SubscriptionRepository } from '../../infrastructure/database/repositori
 import { PlanRepository } from '../../infrastructure/database/repositories/plan.repository';
 import { ProductRepository } from '../../infrastructure/database/repositories/product.repository';
 import { FeatureRepository } from '../../infrastructure/database/repositories/feature.repository';
+import { PlanFeatureConfigRepository } from '../../infrastructure/database/repositories/plan-feature-config.repository';
 import { USAGE_EVENT_REPOSITORY } from '../../domain/repositories/usage-event.repository';
 import { SUBSCRIPTION_REPOSITORY } from '../../domain/repositories/subscription.repository';
+import { PLAN_FEATURE_CONFIG_REPOSITORY } from '@domain/repositories/plan-feature-config.repository';
 import { PLAN_REPOSITORY, PRODUCT_REPOSITORY, FEATURE_REPOSITORY } from '@domain/repositories';
 
 @Module({
@@ -35,6 +37,10 @@ import { PLAN_REPOSITORY, PRODUCT_REPOSITORY, FEATURE_REPOSITORY } from '@domain
         {
             provide: FEATURE_REPOSITORY,
             useClass: FeatureRepository,
+        },
+        {
+            provide: PLAN_FEATURE_CONFIG_REPOSITORY,
+            useClass: PlanFeatureConfigRepository,
         },
     ],
 })

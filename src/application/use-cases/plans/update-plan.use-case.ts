@@ -14,7 +14,7 @@ import { UpdatePlanDto } from '../../dtos/update-plan.dto';
 import { PlanResponseMapper } from '@application/mappers/plan-response.mapper';
 import { Plan, PlanFamily, PlanProps } from '@domain/entities';
 import { Price, RecurringChargePeriod, RenewalDefinition, TimePeriod } from '@domain/value-objects';
-import { PlanPersistenceService } from '@infrastructure/persistence/plan-persistence.service';
+import { PlanPersistenceService, PlanFeatureConfigInput } from '@infrastructure/persistence/plan-persistence.service';
 import { Product, Feature } from '@domain/entities';
 
 @Injectable()
@@ -58,6 +58,7 @@ export class UpdatePlanUseCase {
         // Step 6: Handle products and features (application orchestration)
         let products: Product[] = [];
         let productFeatures: Map<string, Feature[]> = new Map();
+        let featureConfigs: PlanFeatureConfigInput[] = [];
         let finalPlan: Plan = updatedPlan;
 
         if (updateDto.products) {
@@ -82,6 +83,13 @@ export class UpdatePlanUseCase {
                         serviceUrl: featureDto.serviceUrl,
                     });
                     features.push(feature);
+
+                    featureConfigs.push({
+                        featureCode: featureDto.code,
+                        isActive: featureDto.isActive,
+                        quotaLimit: featureDto.quotaLimit,
+                        pricingTiers: featureDto.pricingTiers,
+                    });
                 }
                 productFeatures.set(product.id, features);
             }
@@ -124,6 +132,7 @@ export class UpdatePlanUseCase {
                 finalPlan,
                 products,
                 productFeatures,
+                featureConfigs,
             );
             savedPlan = saved.plan;
             products = saved.products;
@@ -136,6 +145,7 @@ export class UpdatePlanUseCase {
                     finalPlan,
                     products,
                     productFeatures,
+                    featureConfigs,
                 );
                 savedPlan = saved.plan;
                 products = saved.products;

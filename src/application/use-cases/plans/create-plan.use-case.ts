@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreatePlanDto } from '../../dtos/create-plan.dto';
 import { PlanResponseDto } from '../../dtos/plan-response.dto';
 import { PlanResponseMapper } from '@application/mappers/plan-response.mapper';
-import { PlanPersistenceService } from '@infrastructure/persistence/plan-persistence.service';
+import { PlanPersistenceService, PlanFeatureConfigInput } from '@infrastructure/persistence/plan-persistence.service';
 import { Product, Feature, Plan, PlanFamily } from '@domain/entities';
 import { Price } from '@domain/value-objects/price.vo';
 import { RecurringChargePeriod } from '@domain/value-objects/recurring-charge-period.vo';
@@ -24,6 +24,7 @@ export class CreatePlanUseCase {
         // Step 1: Create products with features (domain entities)
         const products: Product[] = [];
         const productFeatures: Map<string, Feature[]> = new Map();
+        const featureConfigs: PlanFeatureConfigInput[] = [];
 
         for (const productDto of dto.products) {
             // Create product entity
@@ -47,6 +48,13 @@ export class CreatePlanUseCase {
                     serviceUrl: featureDto.serviceUrl,
                 });
                 features.push(feature);
+
+                featureConfigs.push({
+                    featureCode: featureDto.code,
+                    isActive: featureDto.isActive,
+                    quotaLimit: featureDto.quotaLimit,
+                    pricingTiers: featureDto.pricingTiers,
+                });
             }
             productFeatures.set(product.id, features);
         }
@@ -63,6 +71,7 @@ export class CreatePlanUseCase {
             plan,
             products,
             productFeatures,
+            featureConfigs,
         );
 
         // Step 4: Map to response DTO

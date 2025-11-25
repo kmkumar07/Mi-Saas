@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Plan, Product, Feature } from '@domain/entities';
+import { Plan, Product, Feature, PlanFeatureConfig } from '@domain/entities';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../database/schema';
@@ -15,15 +15,30 @@ import {
     recurringChargePeriods as recurringChargePeriodsTable,
     renewalDefinitions as renewalDefinitionsTable,
     trialPeriods as trialPeriodsTable,
+    planFeatures as planFeaturesTable,
+    featurePricingTiers as featurePricingTiersTable,
 } from '../database/schema';
 import { Price } from '@domain/value-objects/price.vo';
 import { RenewalDefinition } from '@domain/value-objects/renewal-definition.vo';
 import { TimePeriod } from '@domain/value-objects/time-period.vo';
+import { FeaturePricingTier } from '@domain/value-objects';
 
 export interface PlanAggregatePersistenceResult {
     plan: Plan;
     products: Product[];
     productFeatures: Map<string, Feature[]>;
+}
+
+export interface PlanFeatureConfigInput {
+    featureCode: string;
+    isActive?: boolean;
+    quotaLimit?: number;
+    pricingTiers?: {
+        fromQuantity: number;
+        toQuantity?: number;
+        pricePerUnit: number;
+        currency?: string;
+    }[];
 }
 
 /**
@@ -48,6 +63,7 @@ export class PlanPersistenceService {
         plan: Plan,
         products: Product[],
         productFeatures: Map<string, Feature[]>,
+        featureConfigs: PlanFeatureConfigInput[] = [],
     ): Promise<PlanAggregatePersistenceResult> {
         return await this.db.transaction(async (tx) => {
             // 1. Save products and features
@@ -59,6 +75,14 @@ export class PlanPersistenceService {
                 tx,
                 plan,
                 savedProducts.map(p => p.id),
+            );
+
+            // 3. Save per-plan feature configuration (availability, quotas, pricing tiers)
+            await this.savePlanFeatureConfigurations(
+                tx,
+                savedPlan,
+                savedProductFeatures,
+                featureConfigs,
             );
 
             return {
@@ -261,6 +285,74 @@ export class PlanPersistenceService {
                 planId,
                 productId,
             });
+        }
+    }
+
+    /**
+     * Saves per-plan feature configuration and tiered pricing.
+     */
+    private async savePlanFeatureConfigurations(
+        tx: any,
+        plan: Plan,
+        savedProductFeatures: Map<string, Feature[]>,
+        featureConfigs: PlanFeatureConfigInput[],
+    ): Promise<void> {
+        const configByCode = new Map<string, PlanFeatureConfigInput>();
+        for (const cfg of featureConfigs) {
+            configByCode.set(cfg.featureCode, cfg);
+        }
+
+        for (const [, features] of savedProductFeatures) {
+            for (const feature of features) {
+                const cfg = configByCode.get(feature.code);
+
+                const tiers = (cfg?.pricingTiers ?? []).map(tier =>
+                    new FeaturePricingTier({
+                        fromQuantity: tier.fromQuantity,
+                        toQuantity: tier.toQuantity,
+                        pricePerUnit: tier.pricePerUnit,
+                        currency: tier.currency ?? plan.price.currency,
+                    }),
+                );
+
+                const planFeatureConfig = new PlanFeatureConfig({
+                    planId: plan.id,
+                    featureId: feature.id!,
+                    featureType: feature.featureType,
+                    isActive: cfg?.isActive ?? true,
+                    quotaLimit: cfg?.quotaLimit,
+                    pricingTiers: tiers,
+                });
+
+                // Persist plan_features row
+                const [planFeatureRow] = await tx
+                    .insert(planFeaturesTable)
+                    .values({
+                        planId: planFeatureConfig.planId,
+                        featureId: planFeatureConfig.featureId,
+                        isActive: planFeatureConfig.isActive,
+                        featureType: planFeatureConfig.featureType,
+                        quotaLimit: planFeatureConfig.quotaLimit,
+                        metadata: planFeatureConfig.metadata,
+                    })
+                    .returning();
+
+                // Persist pricing tiers if any
+                const pricingTiers = planFeatureConfig.pricingTiers;
+                if (pricingTiers.length > 0) {
+                    let index = 0;
+                    for (const tier of pricingTiers) {
+                        await tx.insert(featurePricingTiersTable).values({
+                            planFeatureId: planFeatureRow.id,
+                            tierIndex: index++,
+                            fromQuantity: tier.fromQuantity,
+                            toQuantity: tier.toQuantity ?? null,
+                            pricePerUnit: tier.pricePerUnit,
+                            currency: tier.currency,
+                        });
+                    }
+                }
+            }
         }
     }
 }

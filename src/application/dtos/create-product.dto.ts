@@ -1,6 +1,5 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PricingStrategy } from '@domain/enums';
 
 export class CreateProductDto {
     @ApiProperty({
@@ -26,14 +25,6 @@ export class CreateProductDto {
     @IsString()
     @IsOptional()
     description?: string;
-
-    @ApiProperty({
-        description: 'Pricing strategy for the product',
-        enum: PricingStrategy,
-        example: PricingStrategy.METERED,
-    })
-    @IsEnum(PricingStrategy)
-    pricingStrategy: PricingStrategy;
 
     @ApiPropertyOptional({
         description: 'Additional metadata for the product',
