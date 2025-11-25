@@ -85,6 +85,22 @@ export const chargeFrequencyEnum = pgEnum('charge_frequency', [
     'per-second',
 ]);
 
+export const paymentStatusEnum = pgEnum('payment_status', [
+    'pending',
+    'processing',
+    'completed',
+    'failed',
+    'refunded',
+    'partially_refunded',
+]);
+
+export const accountStatusEnum = pgEnum('account_status', [
+    'active',
+    'suspended',
+    'closed',
+]);
+
+
 // ============================
 // TABLE DEFINITIONS
 // ============================
@@ -96,6 +112,44 @@ export const tenants = pgTable('tenants', {
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export const accounts: ReturnType<typeof pgTable> = pgTable('accounts', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+        .references(() => tenants.id, { onDelete: 'cascade' })
+        .notNull(),
+    parentAccountId: uuid('parent_account_id')
+        .references((): any => accounts.id, { onDelete: 'set null' }),
+
+    // Company Information
+    companyName: text('company_name').notNull(),
+    legalName: text('legal_name'),
+    taxId: varchar('tax_id', { length: 50 }),
+
+    // Billing Address
+    billingEmail: varchar('billing_email', { length: 255 }).notNull(),
+    billingAddressLine1: text('billing_address_line1'),
+    billingAddressLine2: text('billing_address_line2'),
+    billingCity: varchar('billing_city', { length: 100 }),
+    billingState: varchar('billing_state', { length: 100 }),
+    billingPostalCode: varchar('billing_postal_code', { length: 20 }),
+    billingCountry: varchar('billing_country', { length: 2 }), // ISO 3166-1 alpha-2
+
+    // Payment Information
+    paymentMethod: varchar('payment_method', { length: 50 }), // 'card', 'bank_transfer', 'invoice'
+    paymentGatewayCustomerId: text('payment_gateway_customer_id'), // Stripe/PayPal customer ID
+
+    // Account Status
+    accountStatus: accountStatusEnum('account_status').default('active').notNull(),
+    creditLimit: bigint('credit_limit', { mode: 'number' }),
+    currentBalance: bigint('current_balance', { mode: 'number' }).default(0),
+
+    // Metadata
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 
 export const products = pgTable('products', {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -203,6 +257,9 @@ export const trialPeriods = pgTable('trial_periods', {
 
 export const subscriptions = pgTable('subscriptions', {
     id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+        .references(() => accounts.id, { onDelete: 'cascade' })
+        .notNull(),
     tenantId: uuid('tenant_id')
         .references(() => tenants.id, { onDelete: 'cascade' })
         .notNull(),
@@ -214,9 +271,73 @@ export const subscriptions = pgTable('subscriptions', {
     seats: integer('seats').default(1),
     currentPeriodStart: timestamp('current_period_start').notNull(),
     currentPeriodEnd: timestamp('current_period_end').notNull(),
+    cancelledAt: timestamp('cancelled_at'),
+    cancellationReason: text('cancellation_reason'),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export const payments = pgTable('payments', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+        .references(() => accounts.id, { onDelete: 'cascade' })
+        .notNull(),
+    subscriptionId: uuid('subscription_id')
+        .references(() => subscriptions.id, { onDelete: 'set null' }),
+
+    // Payment Details
+    amount: bigint('amount', { mode: 'number' }).notNull(), // Amount in cents
+    currency: varchar('currency', { length: 3 }).default('USD').notNull(),
+    status: paymentStatusEnum('status').default('pending').notNull(),
+
+    // Gateway Information
+    gatewayPaymentId: text('gateway_payment_id'), // Stripe/PayPal transaction ID
+    gatewayCustomerId: text('gateway_customer_id'),
+    paymentMethod: varchar('payment_method', { length: 50 }), // 'card', 'bank', etc.
+
+    // Payment Type
+    paymentType: varchar('payment_type', { length: 50 }).notNull(), // 'subscription', 'upgrade', 'addon'
+    description: text('description'),
+
+    // Refund tracking
+    refundedAmount: bigint('refunded_amount', { mode: 'number' }).default(0),
+
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const paymentTransactions = pgTable('payment_transactions', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    paymentId: uuid('payment_id')
+        .references(() => payments.id, { onDelete: 'cascade' })
+        .notNull(),
+
+    previousStatus: paymentStatusEnum('previous_status'),
+    newStatus: paymentStatusEnum('new_status').notNull(),
+
+    amount: bigint('amount', { mode: 'number' }),
+    gatewayResponse: jsonb('gateway_response'),
+    errorMessage: text('error_message'),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const usageEvents = pgTable('usage_events', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+        .references(() => tenants.id, { onDelete: 'cascade' })
+        .notNull(),
+    customerId: uuid('customer_id').notNull(),
+    subscriptionId: uuid('subscription_id')
+        .references(() => subscriptions.id, { onDelete: 'set null' }),
+    featureCode: varchar('feature_code', { length: 100 }).notNull(),
+    quantity: integer('quantity').notNull().default(1),
+    timestamp: timestamp('timestamp').defaultNow().notNull(),
+    metadata: jsonb('metadata'),
+    idempotencyKey: varchar('idempotency_key', { length: 255 }).unique(),
+});
+
 
 export const usageAggregates = pgTable('usage_aggregates', {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -254,6 +375,9 @@ export const invoices = pgTable('invoices', {
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
@@ -280,6 +404,15 @@ export type NewTrialPeriod = typeof trialPeriods.$inferInsert;
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type NewSubscription = typeof subscriptions.$inferInsert;
+
+export type Payment = typeof payments.$inferSelect;
+export type NewPayment = typeof payments.$inferInsert;
+
+export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
+export type NewPaymentTransaction = typeof paymentTransactions.$inferInsert;
+
+export type UsageEvent = typeof usageEvents.$inferSelect;
+export type NewUsageEvent = typeof usageEvents.$inferInsert;
 
 export type UsageAggregate = typeof usageAggregates.$inferSelect;
 export type NewUsageAggregate = typeof usageAggregates.$inferInsert;
