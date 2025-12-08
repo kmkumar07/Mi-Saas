@@ -114,6 +114,7 @@ export class GetPlanUseCase {
             name: plan.name,
             planCode: plan.planCode,
             planType: plan.planType,
+            version: plan.version,
             products,
             price: priceResponse,
             renewalDefinition: renewalDefinitionResponse,

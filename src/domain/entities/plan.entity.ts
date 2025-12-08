@@ -13,7 +13,7 @@ export interface PlanProps {
     renewalDefinition?: RenewalDefinition;
     trialPeriod?: TimePeriod;
     active?: boolean;
-    status?: 'active' | 'archived' | 'draft';
+    status?: 'active' | 'archived' | 'draft' | 'published';
     metadata?: Record<string, any>;
     createdAt?: Date;
     /**
@@ -34,7 +34,7 @@ export class Plan {
     private _renewalDefinition?: RenewalDefinition;
     private _trialPeriod?: TimePeriod;
     private _active: boolean;
-    private _status: 'active' | 'archived' | 'draft';
+    private _status: 'active' | 'archived' | 'draft' | 'published';
     private _metadata?: Record<string, any>;
     private readonly _createdAt: Date;
     private readonly _version: number;
@@ -53,7 +53,7 @@ export class Plan {
         this._renewalDefinition = props.renewalDefinition;
         this._trialPeriod = props.trialPeriod;
         this._active = props.active ?? true;
-        this._status = props.status || 'active';
+        this._status = props.status || 'draft'; // Default to draft for new plans
         this._metadata = props.metadata;
         this._createdAt = props.createdAt ?? new Date();
         this._version = props.version ?? 1;
@@ -92,7 +92,21 @@ export class Plan {
     get renewalDefinition(): RenewalDefinition | undefined { return this._renewalDefinition; }
     get trialPeriod(): TimePeriod | undefined { return this._trialPeriod; }
     get active(): boolean { return this._active; }
-    get status(): 'active' | 'archived' | 'draft' { return this._status; }
+    get status(): 'active' | 'archived' | 'draft' | 'published' { return this._status; }
+    
+    /**
+     * Checks if the plan is published (immutable)
+     */
+    get isPublished(): boolean {
+        return this._status === 'published';
+    }
+    
+    /**
+     * Checks if the plan can be modified in-place
+     */
+    get isMutable(): boolean {
+        return this._status !== 'published';
+    }
     get metadata(): Record<string, any> | undefined { return this._metadata; }
     get createdAt(): Date { return this._createdAt; }
     get version(): number { return this._version; }
@@ -102,16 +116,22 @@ export class Plan {
     /**
      * Creates a new version of this plan.
      * The current plan instance should be archived after calling this.
+     * For published plans, the new version will also be published.
      */
     createNewVersion(changes: Partial<PlanProps>): Plan {
+        // Determine status for new version
+        // If original is published, new version should also be published
+        // Otherwise, default to draft
+        const newStatus = this._status === 'published' ? 'published' : 'draft';
+        
         // Create new plan with same planFamilyId and planCode but new ID
         return new Plan({
             ...this.toProps(),
             ...changes,
             id: undefined, // Will generate new ID
-            planFamilyId: this._planFamilyId, // Keep same family
+            planFamilyId: this._planFamilyId, // Keep same family (family ID is excluded from versioning)
             planCode: this._planCode, // Keep same plan code
-            status: 'active',
+            status: newStatus,
             createdAt: new Date(),
             version: this._version + 1,
         });
@@ -120,6 +140,32 @@ export class Plan {
     archive(): void {
         this._status = 'archived';
         this._active = false;
+    }
+    
+    /**
+     * Publishes the plan, making it immutable.
+     * Once published, all updates must create new versions.
+     */
+    publish(): void {
+        if (this._status === 'published') {
+            throw new Error('Plan is already published');
+        }
+        if (this._status === 'archived') {
+            throw new Error('Cannot publish an archived plan');
+        }
+        this._status = 'published';
+        this._active = true;
+    }
+    
+    /**
+     * Unpublishes the plan, making it mutable again.
+     * Only draft or active plans can be unpublished.
+     */
+    unpublish(): void {
+        if (this._status !== 'published') {
+            throw new Error('Plan is not published');
+        }
+        this._status = 'draft';
     }
 
     toProps(): PlanProps {
@@ -149,33 +195,78 @@ export class Plan {
         this._planCode = planCode;
     }
 
-    // Legacy / mutation methods
-    updatePrice(newPrice: Price): void { this._price = newPrice; }
+    // Legacy / mutation methods - restricted for published plans
+    private ensureMutable(): void {
+        if (this.isPublished) {
+            throw new Error('Cannot modify a published plan. Create a new version instead.');
+        }
+    }
+    
+    updatePrice(newPrice: Price): void {
+        this.ensureMutable();
+        this._price = newPrice;
+    }
+    
     updateName(newName: string): void {
+        this.ensureMutable();
         if (!newName || newName.trim() === '') throw new Error('Plan name cannot be empty');
         this._name = newName;
     }
-    activate(): void { this._active = true; this._status = 'active'; }
-    deactivate(): void { this._active = false; this._status = 'archived'; }
-    updatePlanType(type: PlanType): void { this._planType = type; }
-    updateMetadata(metadata: Record<string, any>): void { this._metadata = { ...this._metadata, ...metadata }; }
+    
+    activate(): void {
+        this.ensureMutable();
+        this._active = true;
+        this._status = 'active';
+    }
+    
+    deactivate(): void {
+        this.ensureMutable();
+        this._active = false;
+        this._status = 'archived';
+    }
+    
+    updatePlanType(type: PlanType): void {
+        this.ensureMutable();
+        this._planType = type;
+    }
+    
+    updateMetadata(metadata: Record<string, any>): void {
+        this.ensureMutable();
+        this._metadata = { ...this._metadata, ...metadata };
+    }
+    
     addProduct(productId: string): void {
+        this.ensureMutable();
         if (!this._productIds.includes(productId)) this._productIds.push(productId);
     }
+    
     removeProduct(productId: string): void {
+        this.ensureMutable();
         this._productIds = this._productIds.filter(id => id !== productId);
         if (this._productIds.length === 0) throw new Error('Plan must have at least one product');
     }
-    updateRenewalDefinition(renewalDefinition: RenewalDefinition): void { this._renewalDefinition = renewalDefinition; }
-    updateTrialPeriod(trialPeriod: TimePeriod): void { this._trialPeriod = trialPeriod; }
+    
+    updateRenewalDefinition(renewalDefinition: RenewalDefinition): void {
+        this.ensureMutable();
+        this._renewalDefinition = renewalDefinition;
+    }
+    
+    updateTrialPeriod(trialPeriod: TimePeriod): void {
+        this.ensureMutable();
+        this._trialPeriod = trialPeriod;
+    }
     hasTrialPeriod(): boolean { return this._trialPeriod !== undefined; }
     hasRenewalDefinition(): boolean { return this._renewalDefinition !== undefined; }
 
     /**
      * Applies updates directly to this plan instance.
      * This encapsulates the in-place mutation logic that was previously in the domain service.
+     * Throws error if plan is published (immutable).
      */
     applyDirectUpdates(changes: Partial<PlanProps>): void {
+        if (this.isPublished) {
+            throw new Error('Cannot apply direct updates to a published plan. Create a new version instead.');
+        }
         if (changes.name !== undefined) {
             this.updateName(changes.name);
         }

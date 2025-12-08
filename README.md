@@ -31,6 +31,7 @@ src/
 - ✅ **Feature management** with meter types (API calls, events, storage, bandwidth, CPU, GPU)
 - ✅ **Type-safe database** with Drizzle ORM
 - ✅ **API documentation** with Swagger
+- ✅ **Razorpay payment integration** with order-based flow and webhook support
 
 ## 📋 Prerequisites
 
@@ -215,7 +216,22 @@ npm run test:cov
 NODE_ENV=development
 DATABASE_URL=postgresql://user:password@localhost:5432/ag_saas
 PORT=3000
+
+# Razorpay Payment Gateway Configuration
+RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxxx
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
+RAZORPAY_SUCCESS_URL=https://your-frontend.com/payment/success
+RAZORPAY_CANCEL_URL=https://your-frontend.com/payment/cancel
 ```
+
+### Razorpay Setup
+
+1. Sign up for a Razorpay account at https://razorpay.com
+2. Get your API keys from the Razorpay Dashboard → Settings → API Keys
+3. Set up webhooks in Razorpay Dashboard → Settings → Webhooks
+4. Configure the webhook URL: `https://your-api.com/api/webhooks/razorpay`
+5. Copy the webhook secret and set it in `RAZORPAY_WEBHOOK_SECRET`
 
 ## 📝 License
 

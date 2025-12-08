@@ -161,6 +161,7 @@ export class PlanFamily {
 
     /**
      * Updates the latest plan according to business rules:
+     * - If the plan is published (immutable), always create a new version.
      * - If there are active subscriptions, archive the latest plan and create a new version.
      * - Otherwise, apply updates directly to the latest plan.
      */
@@ -169,6 +170,23 @@ export class PlanFamily {
         hasActiveSubscriptions: boolean,
     ): { originalPlan: Plan; updatedPlan: Plan } {
         const latest = this.latestPlan;
+
+        // Published plans are immutable - always create new version
+        if (latest.isPublished) {
+            // Archive the original plan (if not already archived)
+            if (latest.status !== 'archived') {
+                latest.archive();
+            }
+
+            // Create a new plan version (will also be published)
+            const newVersion = latest.createNewVersion(changes);
+            this._plans.push(newVersion);
+
+            return {
+                originalPlan: latest,
+                updatedPlan: newVersion,
+            };
+        }
 
         if (hasActiveSubscriptions) {
             // Archive the original plan
@@ -184,7 +202,7 @@ export class PlanFamily {
             };
         }
 
-        // Directly apply updates to the existing latest plan
+        // Directly apply updates to the existing latest plan (only for draft/active plans without subscriptions)
         latest.applyDirectUpdates(changes);
 
         return {

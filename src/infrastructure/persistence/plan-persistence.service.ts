@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Plan, Product, Feature, PlanFeatureConfig, PlanFamily } from '@domain/entities';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { ProductMapper } from '../mappers/product.mapper';
 import { FeatureMapper } from '../mappers/feature.mapper';
@@ -13,6 +13,8 @@ import {
     features as featuresTable,
     plans as plansTable,
     planProducts as planProductsTable,
+    planProductVersions as planProductVersionsTable,
+    productVersions as productVersionsTable,
     prices as pricesTable,
     recurringChargePeriods as recurringChargePeriodsTable,
     renewalDefinitions as renewalDefinitionsTable,
@@ -20,6 +22,8 @@ import {
     planFeatures as planFeaturesTable,
     featurePricingTiers as featurePricingTiersTable,
 } from '../database/schema';
+import { IProductVersionRepository, PRODUCT_VERSION_REPOSITORY } from '@domain/repositories/product-version.repository.interface';
+import { ProductVersion } from '@domain/entities/product-version.entity';
 import { Price } from '@domain/value-objects/price.vo';
 import { RenewalDefinition } from '@domain/value-objects/renewal-definition.vo';
 import { TimePeriod } from '@domain/value-objects/time-period.vo';
@@ -59,6 +63,8 @@ export class PlanPersistenceService {
         private readonly planMapper: PlanMapper,
         @Inject(PLAN_FAMILY_REPOSITORY)
         private readonly planFamilyRepository: IPlanFamilyRepository,
+        @Inject(PRODUCT_VERSION_REPOSITORY)
+        private readonly productVersionRepository: IProductVersionRepository,
     ) { }
 
     /**
@@ -132,7 +138,17 @@ export class PlanPersistenceService {
                 products.map(p => p.id!),
             );
 
-            // 2. Save per-plan feature configuration (availability, quotas, pricing tiers)
+            // 2. If plan is published, create product versions for immutability
+            // This must happen after plan is saved so we have the planId
+            if (savedPlan.isPublished) {
+                await this.createProductVersionsForPlan(tx, savedPlan, products);
+                // Re-link to product versions instead of products
+                // Delete existing plan_products links and create plan_product_versions links
+                await tx.delete(planProductsTable).where(eq(planProductsTable.planId, savedPlan.id));
+                await this.savePlanProductVersions(tx, savedPlan.id, products);
+            }
+
+            // 3. Save per-plan feature configuration (availability, quotas, pricing tiers)
             await this.savePlanFeatureConfigurations(
                 tx,
                 savedPlan,
@@ -242,8 +258,11 @@ export class PlanPersistenceService {
         // Note: Based on schema, plans table doesn't seem to have priceId, so this might not be needed
         // But keeping it for compatibility with plan mapper
 
-        // Save plan-product relationships
-        await this.savePlanProductRelationships(tx, planRow[0].id, productIds);
+        // Save plan-product relationships (for draft/active plans)
+        // Published plans will have product versions linked separately
+        if (plan.status !== 'published') {
+            await this.savePlanProductRelationships(tx, planRow[0].id, productIds);
+        }
 
         // Map back to domain (pass productIds to satisfy validation)
         return this.planMapper.toDomain(
@@ -339,16 +358,86 @@ export class PlanPersistenceService {
 
     /**
      * Saves plan-product relationships
+     * For draft/active plans, links directly to products
      */
     private async savePlanProductRelationships(
         tx: any,
         planId: string,
         productIds: string[],
     ): Promise<void> {
+        // For draft/active plans, use regular plan_products
         for (const productId of productIds) {
             await tx.insert(planProductsTable).values({
                 planId,
                 productId,
+            });
+        }
+    }
+    
+    /**
+     * Saves plan-product version relationships
+     * For published plans, links to product versions instead of products directly
+     */
+    private async savePlanProductVersions(
+        tx: any,
+        planId: string,
+        products: Product[],
+    ): Promise<void> {
+        // For published plans, link to product versions
+        // Product versions should already be created by createProductVersionsForPlan
+        for (const product of products) {
+            // Find the latest product version for this product
+            const productVersions = await tx
+                .select()
+                .from(productVersionsTable)
+                .where(eq(productVersionsTable.productId, product.id!))
+                .orderBy(desc(productVersionsTable.version))
+                .limit(1);
+            
+            if (productVersions.length > 0) {
+                await tx.insert(planProductVersionsTable).values({
+                    planId,
+                    productVersionId: productVersions[0].id,
+                });
+            }
+        }
+    }
+    
+    /**
+     * Creates product versions for all products linked to a published plan
+     * This ensures immutability - the product state is snapshotted
+     */
+    private async createProductVersionsForPlan(
+        tx: any,
+        plan: Plan,
+        products: Product[],
+    ): Promise<void> {
+        for (const product of products) {
+            // Check if a product version already exists for this product
+            // Get the latest version number
+            const existingVersions = await tx
+                .select()
+                .from(productVersionsTable)
+                .where(eq(productVersionsTable.productId, product.id!))
+                .orderBy(desc(productVersionsTable.version))
+                .limit(1);
+            
+            const nextVersion = existingVersions.length > 0 
+                ? existingVersions[0].version + 1 
+                : 1;
+            
+            // Create product version snapshot
+            const productVersion = product.createVersion(nextVersion);
+            
+            await tx.insert(productVersionsTable).values({
+                id: productVersion.id,
+                productId: productVersion.productId,
+                version: productVersion.version,
+                name: productVersion.name,
+                description: productVersion.description,
+                apiKey: productVersion.apiKey,
+                active: productVersion.active,
+                metadata: productVersion.metadata,
             });
         }
     }

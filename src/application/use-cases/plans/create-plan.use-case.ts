@@ -174,6 +174,7 @@ export class CreatePlanUseCase {
             trialPeriod,
             metadata: dto.metadata,
             version: 1, // Initial version
+            status: dto.status || 'draft', // Default to draft
         });
     }
 }

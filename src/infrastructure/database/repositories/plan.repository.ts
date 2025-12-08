@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import { Plan } from '@domain/entities';
 import { IPlanRepository } from '@domain/repositories';
 import {
@@ -135,9 +135,50 @@ export class PlanRepository implements IPlanRepository {
         const results = await this.db
             .select()
             .from(schema.plans)
-            .where(eq(schema.plans.planFamilyId, planFamilyId));
+            .where(eq(schema.plans.planFamilyId, planFamilyId))
+            .orderBy(desc(schema.plans.version));
 
         return Promise.all(results.map((row) => this.toDomain(row)));
+    }
+
+    async findLatestByPlanFamilyId(planFamilyId: string): Promise<Plan | null> {
+        const results = await this.db
+            .select()
+            .from(schema.plans)
+            .where(
+                and(
+                    eq(schema.plans.planFamilyId, planFamilyId),
+                    // Only get active or published plans (not archived)
+                    // Using status check - we'll filter in application layer if needed
+                )
+            )
+            .orderBy(desc(schema.plans.version))
+            .limit(1);
+
+        if (results.length === 0) {
+            return null;
+        }
+
+        return this.toDomain(results[0]);
+    }
+
+    async findByPlanFamilyIdAndVersion(planFamilyId: string, version: number): Promise<Plan | null> {
+        const results = await this.db
+            .select()
+            .from(schema.plans)
+            .where(
+                and(
+                    eq(schema.plans.planFamilyId, planFamilyId),
+                    eq(schema.plans.version, version)
+                )
+            )
+            .limit(1);
+
+        if (results.length === 0) {
+            return null;
+        }
+
+        return this.toDomain(results[0]);
     }
 
     async findAll(): Promise<Plan[]> {
@@ -271,12 +312,47 @@ export class PlanRepository implements IPlanRepository {
 
     private async toDomain(row: schema.Plan): Promise<Plan> {
         // Fetch product IDs
-        const planProductResults = await this.db
-            .select()
-            .from(schema.planProducts)
-            .where(eq(schema.planProducts.planId, row.id));
+        // For published plans, use plan_product_versions (immutable)
+        // For draft/active plans, use plan_products
+        let productIds: string[] = [];
+        
+        if (row.status === 'published') {
+            // For published plans, get product IDs from product versions
+            // First get product version IDs linked to this plan
+            const planProductVersionLinks = await this.db
+                .select()
+                .from(schema.planProductVersions)
+                .where(eq(schema.planProductVersions.planId, row.id));
+            
+            // Then get the product IDs from those versions
+            if (planProductVersionLinks.length > 0) {
+                const productVersionIds = planProductVersionLinks.map(ppv => ppv.productVersionId);
+                const productVersions = await this.db
+                    .select()
+                    .from(schema.productVersions)
+                    .where(inArray(schema.productVersions.id, productVersionIds));
+                
+                productIds = productVersions.map(pv => pv.productId);
+            } else {
+                // Fallback: if no product versions exist, use plan_products
+                // This handles cases where plans were published before product versioning
+                // or seed data that doesn't create product versions
+                const planProductResults = await this.db
+                    .select()
+                    .from(schema.planProducts)
+                    .where(eq(schema.planProducts.planId, row.id));
 
-        const productIds = planProductResults.map(pp => pp.productId);
+                productIds = planProductResults.map(pp => pp.productId);
+            }
+        } else {
+            // For draft/active plans, use regular plan_products
+            const planProductResults = await this.db
+                .select()
+                .from(schema.planProducts)
+                .where(eq(schema.planProducts.planId, row.id));
+
+            productIds = planProductResults.map(pp => pp.productId);
+        }
 
         // Fetch price
         const priceResult = await this.db

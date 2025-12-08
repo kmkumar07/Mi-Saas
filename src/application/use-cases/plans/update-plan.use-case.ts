@@ -39,23 +39,42 @@ export class UpdatePlanUseCase {
             throw new NotFoundException(`Plan with ID ${planId} not found`);
         }
 
-        // Step 2: Check if plan has active subscriptions (infrastructure concern - querying)
+        // Step 2: Check if plan is published (immutable)
+        // If published, we must create a new version regardless of subscriptions
+        const isPublished = existingPlan.isPublished;
+        
+        // Step 3: Check if plan has active subscriptions (infrastructure concern - querying)
         const activeSubscriptions = await this.subscriptionRepository.findActiveByPlanId(planId);
         const hasActiveSubscriptions = activeSubscriptions.length > 0;
 
-        // Step 3: Construct aggregate root for plan family
+        // Step 4: Handle status changes (publish/unpublish)
+        if (updateDto.status !== undefined) {
+            if (updateDto.status === 'published' && !isPublished) {
+                // Publishing a draft plan - will be handled in persistence
+                existingPlan.publish();
+            } else if (updateDto.status !== 'published' && isPublished) {
+                // Unpublishing a published plan
+                existingPlan.unpublish();
+            }
+        }
+
+        // Step 5: If plan is published, we must create a new version (immutable)
+        // Otherwise, use existing logic
+        const mustCreateVersion = isPublished || hasActiveSubscriptions;
+
+        // Step 6: Construct aggregate root for plan family
         const planFamily = PlanFamily.fromPlans([existingPlan]);
 
-        // Step 4: Convert DTO to domain changes
+        // Step 7: Convert DTO to domain changes
         const changes = await this.convertDtoToPlanProps(updateDto, existingPlan);
 
-        // Step 5: Apply updates using aggregate root (business logic)
+        // Step 8: Apply updates using aggregate root (business logic)
         const { originalPlan, updatedPlan } = planFamily.updateLatestPlan(
             changes,
-            hasActiveSubscriptions,
+            mustCreateVersion,
         );
 
-        // Step 6: Handle products and features (application orchestration)
+        // Step 9: Handle products and features (application orchestration)
         let products: Product[] = [];
         let productFeatures: Map<string, Feature[]> = new Map();
         let featureConfigs: PlanFeatureConfigInput[] = [];
@@ -144,13 +163,15 @@ export class UpdatePlanUseCase {
             });
         }
 
-        // Step 7: Persist changes (infrastructure concern)
+        // Step 10: Persist changes (infrastructure concern)
         let savedPlan: Plan;
         const hasProductOrFeatureChanges = updateDto.productIds || (updateDto.featureConfigs && updateDto.featureConfigs.length > 0);
         
-        if (hasActiveSubscriptions) {
-            // Save archived original plan
-            await this.planRepository.update(originalPlan);
+        if (mustCreateVersion) {
+            // Save archived original plan (if it's a new version)
+            if (originalPlan.id !== updatedPlan.id) {
+                await this.planRepository.update(originalPlan);
+            }
 
             // Save new version with products and features
             const saved = await this.planPersistenceService.savePlanWithExistingEntities(
@@ -163,7 +184,7 @@ export class UpdatePlanUseCase {
             products = saved.products;
             productFeatures = saved.productFeatures;
         } else {
-            // Update existing plan directly
+            // Update existing plan directly (only for draft/active plans without subscriptions)
             if (hasProductOrFeatureChanges) {
                 // If products or features are being updated, use persistence service
                 const saved = await this.planPersistenceService.savePlanWithExistingEntities(
@@ -181,7 +202,7 @@ export class UpdatePlanUseCase {
             }
         }
 
-        // Step 8: Map to response DTO
+        // Step 11: Map to response DTO
         return this.planResponseMapper.toResponseDto(
             savedPlan,
             products,
@@ -246,6 +267,10 @@ export class UpdatePlanUseCase {
 
         if (dto.metadata !== undefined) {
             changes.metadata = dto.metadata;
+        }
+
+        if (dto.status !== undefined) {
+            changes.status = dto.status;
         }
 
         return changes;

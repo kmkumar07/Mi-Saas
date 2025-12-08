@@ -104,4 +104,12 @@ async function requireFeature(featureCode) {
   1.upgrade plans -> versioning -> publishing plans
   2.create payment module for the subscription 
   3.create prorate or upgrade plan logic (low priority)
-  
+
+ 4 types of charging plans
+  - flat rate
+  - per seat
+  - per api call
+  - tiered
+  - package
+  - volume
+ 

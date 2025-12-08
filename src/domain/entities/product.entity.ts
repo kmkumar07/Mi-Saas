@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { ProductVersion } from './product-version.entity';
 
 export interface ProductProps {
     id?: string;
@@ -95,5 +96,23 @@ export class Product {
 
     updateMetadata(metadata: Record<string, any>): void {
         this._metadata = { ...this._metadata, ...metadata };
+    }
+    
+    /**
+     * Creates a version snapshot of this product.
+     * Used when linking products to published plans for immutability.
+     * @param version The version number for this snapshot
+     * @returns A ProductVersion entity representing this product's state
+     */
+    createVersion(version: number): ProductVersion {
+        return new ProductVersion({
+            productId: this._id,
+            version,
+            name: this._name,
+            description: this._description,
+            apiKey: this._apiKey,
+            active: this._active,
+            metadata: this._metadata,
+        });
     }
 }

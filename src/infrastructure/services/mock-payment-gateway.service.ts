@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Account } from '../../domain/entities/account.entity';
-import { IPaymentGateway, PaymentResult, RefundResult, PaymentStatus } from '../../domain/services/payment-gateway.interface';
+import { IPaymentGateway, PaymentResult, RefundResult, PaymentStatus, OrderResult } from '../../domain/services/payment-gateway.interface';
 
 @Injectable()
 export class MockPaymentGatewayService implements IPaymentGateway {
@@ -70,5 +70,31 @@ export class MockPaymentGatewayService implements IPaymentGateway {
     async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
         const payment = this.payments.get(paymentId);
         return payment?.status || 'unknown';
+    }
+
+    async createOrder(amount: number, currency: string, receipt: string, metadata?: any): Promise<OrderResult> {
+        const orderId = `mock_order_${randomUUID()}`;
+        console.log(`[MOCK PAYMENT GATEWAY] Created order ${orderId} for amount ${amount} ${currency}`);
+        
+        return {
+            orderId,
+            amount,
+            currency,
+            keyId: 'mock_key_id',
+            gatewayResponse: {
+                id: orderId,
+                amount,
+                currency,
+                receipt,
+                status: 'created',
+                metadata,
+            },
+        };
+    }
+
+    verifyWebhookSignature(payload: string | object, signature: string): boolean {
+        // Mock implementation - always returns true for testing
+        console.log('[MOCK PAYMENT GATEWAY] Webhook signature verification (mock: always true)');
+        return true;
     }
 }

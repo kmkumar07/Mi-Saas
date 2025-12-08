@@ -150,11 +150,17 @@ export class PlanResponseDto {
   active: boolean;
 
   @ApiProperty({ 
-    enum: ['active', 'archived', 'draft'], 
-    example: 'active',
-    description: 'Plan status: active (available for new subscriptions), archived (no longer available), draft (not yet published)'
+    enum: ['active', 'archived', 'draft', 'published'], 
+    example: 'draft',
+    description: 'Plan status: draft (not yet published), published (immutable, available for subscriptions), active (available for new subscriptions), archived (no longer available)'
   })
-  status: 'active' | 'archived' | 'draft';
+  status: 'active' | 'archived' | 'draft' | 'published';
+
+  @ApiProperty({ 
+    example: 1,
+    description: 'Plan version number within its family. Increments when a new version is created.'
+  })
+  version: number;
 
   @ApiPropertyOptional({ example: { customField: 'value' } })
   metadata?: Record<string, any>;

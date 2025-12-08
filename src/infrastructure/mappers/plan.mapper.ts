@@ -23,7 +23,7 @@ export class PlanMapper {
         renewalDefinitionId?: string;
         trialPeriodId?: string;
         active: boolean;
-        status: 'active' | 'archived' | 'draft';
+        status: 'active' | 'archived' | 'draft' | 'published';
         metadata?: Record<string, any>;
         createdAt?: Date;
     } {

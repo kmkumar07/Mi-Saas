@@ -117,4 +117,13 @@ export class CreatePlanDto {
     @IsOptional()
     @IsObject()
     metadata?: Record<string, any>;
+
+    @ApiPropertyOptional({
+        description: 'Plan status (defaults to draft)',
+        enum: ['draft', 'published', 'active', 'archived'],
+        example: 'draft',
+    })
+    @IsOptional()
+    @IsEnum(['draft', 'published', 'active', 'archived'])
+    status?: 'draft' | 'published' | 'active' | 'archived';
 }

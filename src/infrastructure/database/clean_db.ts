@@ -7,6 +7,8 @@ import {
     features,
     plans,
     planProducts,
+    planFeatures,
+    planFamilies,
     prices,
     recurringChargePeriods,
     renewalDefinitions,
@@ -14,6 +16,8 @@ import {
     subscriptions,
     payments,
     paymentTransactions,
+    paymentOrders,
+    webhookEvents,
     usageEvents,
 } from './schema';
 
@@ -24,16 +28,21 @@ async function clean() {
     const db = drizzle(client);
 
     try {
+        // Delete in reverse order of dependencies
         await db.delete(usageEvents);
+        await db.delete(webhookEvents);
         await db.delete(paymentTransactions);
+        await db.delete(paymentOrders);
         await db.delete(payments);
         await db.delete(subscriptions);
         await db.delete(trialPeriods);
         await db.delete(renewalDefinitions);
         await db.delete(recurringChargePeriods);
         await db.delete(prices);
+        await db.delete(planFeatures);
         await db.delete(planProducts);
         await db.delete(plans);
+        await db.delete(planFamilies);
         await db.delete(features);
         await db.delete(products);
         await db.delete(accounts);

@@ -17,6 +17,14 @@ export interface RefundResult {
     errorMessage?: string;
 }
 
+export interface OrderResult {
+    orderId: string; // Gateway order ID (e.g., Razorpay order ID)
+    amount: number;
+    currency: string;
+    keyId: string; // Gateway key ID for frontend (e.g., Razorpay key ID)
+    gatewayResponse?: any;
+}
+
 export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'refunded' | 'unknown';
 
 /**
@@ -56,6 +64,24 @@ export interface IPaymentGateway {
      * @returns Current payment status
      */
     getPaymentStatus(paymentId: string): Promise<PaymentStatus>;
+
+    /**
+     * Create a payment order in the gateway (for order-based flows like Razorpay)
+     * @param amount - Amount in paise/cents
+     * @param currency - Currency code (e.g., 'INR', 'USD')
+     * @param receipt - Receipt identifier
+     * @param metadata - Additional order metadata
+     * @returns Order result with gateway order details
+     */
+    createOrder(amount: number, currency: string, receipt: string, metadata?: any): Promise<OrderResult>;
+
+    /**
+     * Verify webhook signature
+     * @param payload - Webhook payload (as string or object)
+     * @param signature - Signature from webhook headers
+     * @returns True if signature is valid
+     */
+    verifyWebhookSignature(payload: string | object, signature: string): boolean;
 }
 
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');

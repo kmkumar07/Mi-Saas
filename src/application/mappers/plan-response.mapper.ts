@@ -26,6 +26,7 @@ export class PlanResponseMapper {
             trialPeriod: this.mapTrialPeriod(plan),
             active: plan.active,
             status: plan.status,
+            version: plan.version,
             metadata: plan.metadata,
             createdAt: plan.createdAt,
         };

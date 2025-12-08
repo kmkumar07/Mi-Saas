@@ -91,6 +91,14 @@ export const accountStatusEnum = pgEnum('account_status', [
     'closed',
 ]);
 
+export const paymentOrderStatusEnum = pgEnum('payment_order_status', [
+    'pending',
+    'created',
+    'attempted',
+    'paid',
+    'failed',
+]);
+
 
 // ============================
 // TABLE DEFINITIONS
@@ -152,6 +160,23 @@ export const products = pgTable('products', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Product versions table - snapshots of products when linked to published plans
+export const productVersions = pgTable('product_versions', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    productId: uuid('product_id')
+        .references(() => products.id, { onDelete: 'cascade' })
+        .notNull(),
+    version: integer('version').notNull().default(1),
+    name: text('name').notNull(),
+    description: text('description'),
+    apiKey: text('api_key'),
+    active: boolean('active').default(true).notNull(),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+    productVersionUnique: unique().on(table.productId, table.version),
+}));
+
 export const features = pgTable('features', {
     id: uuid('id').primaryKey().defaultRandom(),
     productId: uuid('product_id')
@@ -171,6 +196,7 @@ export const planStatusEnum = pgEnum('plan_status', [
     'active',
     'archived',
     'draft',
+    'published',
 ]);
 
 export const planFamilies = pgTable('plan_families', {
@@ -192,7 +218,7 @@ export const plans = pgTable('plans', {
     planCode: text('plan_code').notNull(), // Denormalized from plan_families for fast lookups
     planType: planTypeEnum('plan_type').notNull(),
     version: integer('version').notNull().default(1),
-    status: planStatusEnum('status').default('active').notNull(),
+    status: planStatusEnum('status').default('draft').notNull(), // Default to draft for new plans
     active: boolean('active').default(true).notNull(), // Deprecated, use status instead
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -201,6 +227,7 @@ export const plans = pgTable('plans', {
 }));
 
 // Plan-Product junction table (many-to-many relationship)
+// For draft plans, links directly to products
 export const planProducts = pgTable('plan_products', {
     id: uuid('id').primaryKey().defaultRandom(),
     planId: uuid('plan_id')
@@ -211,6 +238,21 @@ export const planProducts = pgTable('plan_products', {
         .notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+// Plan-Product Versions junction table (for published plans)
+// Links published plans to specific product versions for immutability
+export const planProductVersions = pgTable('plan_product_versions', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    planId: uuid('plan_id')
+        .references(() => plans.id, { onDelete: 'cascade' })
+        .notNull(),
+    productVersionId: uuid('product_version_id')
+        .references(() => productVersions.id, { onDelete: 'cascade' })
+        .notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+    planProductVersionUnique: unique().on(table.planId, table.productVersionId),
+}));
 
 // Per-plan feature configuration
 export const planFeatures = pgTable('plan_features', {
@@ -408,6 +450,43 @@ export const invoices = pgTable('invoices', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const paymentOrders = pgTable('payment_orders', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+        .references(() => accounts.id, { onDelete: 'cascade' })
+        .notNull(),
+    subscriptionId: uuid('subscription_id')
+        .references(() => subscriptions.id, { onDelete: 'set null' }),
+    planId: uuid('plan_id')
+        .references(() => plans.id, { onDelete: 'restrict' })
+        .notNull(),
+    paymentId: uuid('payment_id')
+        .references(() => payments.id, { onDelete: 'set null' }),
+    razorpayOrderId: text('razorpay_order_id').notNull().unique(),
+    amount: bigint('amount', { mode: 'number' }).notNull(), // Amount in paise/cents
+    currency: varchar('currency', { length: 3 }).default('INR').notNull(),
+    status: paymentOrderStatusEnum('status').default('pending').notNull(),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const webhookEvents = pgTable('webhook_events', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventId: text('event_id').notNull().unique(), // Razorpay event ID for idempotency
+    eventType: varchar('event_type', { length: 100 }).notNull(), // payment.captured, payment.failed, etc.
+    paymentOrderId: uuid('payment_order_id')
+        .references(() => paymentOrders.id, { onDelete: 'set null' }),
+    paymentId: uuid('payment_id')
+        .references(() => payments.id, { onDelete: 'set null' }),
+    payload: jsonb('payload').notNull(), // Full webhook payload
+    signature: text('signature'), // Stored signature for audit
+    processed: boolean('processed').default(false).notNull(),
+    processedAt: timestamp('processed_at'),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // ============================
 // TYPE EXPORTS
 // ============================
@@ -421,6 +500,9 @@ export type NewAccount = typeof accounts.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
+export type ProductVersion = typeof productVersions.$inferSelect;
+export type NewProductVersion = typeof productVersions.$inferInsert;
+
 export type Feature = typeof features.$inferSelect;
 export type NewFeature = typeof features.$inferInsert;
 
@@ -432,6 +514,9 @@ export type NewPlan = typeof plans.$inferInsert;
 
 export type PlanProduct = typeof planProducts.$inferSelect;
 export type NewPlanProduct = typeof planProducts.$inferInsert;
+
+export type PlanProductVersion = typeof planProductVersions.$inferSelect;
+export type NewPlanProductVersion = typeof planProductVersions.$inferInsert;
 
 export type PlanFeature = typeof planFeatures.$inferSelect;
 export type NewPlanFeature = typeof planFeatures.$inferInsert;
@@ -468,3 +553,9 @@ export type NewUsageAggregate = typeof usageAggregates.$inferInsert;
 
 export type Invoice = typeof invoices.$inferSelect;
 export type NewInvoice = typeof invoices.$inferInsert;
+
+export type PaymentOrder = typeof paymentOrders.$inferSelect;
+export type NewPaymentOrder = typeof paymentOrders.$inferInsert;
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+export type NewWebhookEvent = typeof webhookEvents.$inferInsert;

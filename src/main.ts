@@ -4,7 +4,9 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, {
+        rawBody: true, // Enable raw body for webhook signature verification
+    });
 
     // Global validation pipe
     app.useGlobalPipes(
@@ -27,6 +29,8 @@ async function bootstrap() {
         .addTag('products', 'Product management endpoints')
         .addTag('features', 'Feature management endpoints')
         .addTag('subscriptions', 'Subscription management endpoints')
+        .addTag('payments', 'Payment order management endpoints')
+        .addTag('webhooks', 'Webhook endpoints for payment gateway events')
         .build();
 
     const document = SwaggerModule.createDocument(app, config);

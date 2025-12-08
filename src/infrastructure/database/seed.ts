@@ -7,6 +7,8 @@ import {
     features,
     plans,
     planProducts,
+    planFamilies,
+    planFeatures,
     prices,
     recurringChargePeriods,
     renewalDefinitions,
@@ -36,8 +38,10 @@ async function seed() {
         await db.delete(renewalDefinitions);
         await db.delete(recurringChargePeriods);
         await db.delete(prices);
+        await db.delete(planFeatures);
         await db.delete(planProducts);
         await db.delete(plans);
+        await db.delete(planFamilies);
         await db.delete(features);
         await db.delete(products);
         await db.delete(accounts);
@@ -609,18 +613,673 @@ async function seed() {
             },
         ]);
 
+        // ============================================
+        // SNAP FLOW PRODUCT SEED DATA
+        // ============================================
+        console.log('\n🌱 Creating Snap Flow product and plans...');
+
+        // Create Snap Flow Product
+        const [snapFlowProduct] = await db.insert(products).values([
+            {
+                id: '660e8400-e29b-41d4-a716-446655440001',
+                name: 'snap flow',
+                description: 'Complete studio management solution with billing, photo selection, client management, and more',
+                apiKey: 'api_key_snap_flow',
+                active: true,
+                metadata: { category: 'Studio Management', industry: 'Photography' },
+            },
+        ]).returning();
+
+        // Create Snap Flow Features
+        console.log('Creating Snap Flow features...');
+        const snapFlowFeatures = await db.insert(features).values([
+            {
+                id: '660e8400-e29b-41d4-a716-446655440101',
+                productId: snapFlowProduct.id,
+                name: 'Studio Shops',
+                code: 'studio_shops',
+                description: 'Number of studio shops allowed',
+                featureType: 'quota',
+                chargeModel: 'flat',
+                metadata: { unit: 'shops' },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440102',
+                productId: snapFlowProduct.id,
+                name: 'Indoor Billing',
+                code: 'indoor_billing',
+                description: 'Unlimited indoor billing',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { unlimited: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440103',
+                productId: snapFlowProduct.id,
+                name: 'Outdoor Billing',
+                code: 'outdoor_billing',
+                description: 'Unlimited outdoor billing',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { unlimited: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440104',
+                productId: snapFlowProduct.id,
+                name: 'Photo Selection Albums',
+                code: 'photo_selection_albums',
+                description: 'Number of photo selection albums allowed',
+                featureType: 'quota',
+                chargeModel: 'flat',
+                metadata: { unit: 'albums' },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440105',
+                productId: snapFlowProduct.id,
+                name: 'File Storage',
+                code: 'file_storage',
+                description: 'File storage capacity in GB',
+                featureType: 'quota',
+                chargeModel: 'flat',
+                metadata: { unit: 'GB' },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440106',
+                productId: snapFlowProduct.id,
+                name: 'Email Notifications',
+                code: 'email_notifications',
+                description: 'Email notification support',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440107',
+                productId: snapFlowProduct.id,
+                name: 'Whatsapp Notifications',
+                code: 'whatsapp_notifications',
+                description: 'WhatsApp notification support',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440108',
+                productId: snapFlowProduct.id,
+                name: 'SMS Notifications',
+                code: 'sms_notifications',
+                description: 'SMS notification support',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440109',
+                productId: snapFlowProduct.id,
+                name: 'Social Media Integration',
+                code: 'social_media_integration',
+                description: 'Integrate WhatsApp, Instagram, Facebook Business Accounts',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { platforms: ['whatsapp', 'instagram', 'facebook'] },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440110',
+                productId: snapFlowProduct.id,
+                name: 'Marketing Tools',
+                code: 'marketing_tools',
+                description: 'Marketing tools and campaigns',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440111',
+                productId: snapFlowProduct.id,
+                name: 'Expense Management',
+                code: 'expense_management',
+                description: 'Track and manage expenses',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440112',
+                productId: snapFlowProduct.id,
+                name: 'Client Management',
+                code: 'client_management',
+                description: 'Manage clients and contacts',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440113',
+                productId: snapFlowProduct.id,
+                name: 'Report Management',
+                code: 'report_management',
+                description: 'Generate and manage reports',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440114',
+                productId: snapFlowProduct.id,
+                name: 'AI Assistant',
+                code: 'ai_assistant',
+                description: 'AI-powered assistant for studio management',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440115',
+                productId: snapFlowProduct.id,
+                name: 'AI Image Assistant',
+                code: 'ai_image_assistant',
+                description: 'AI-powered image editing and enhancement',
+                featureType: 'boolean',
+                chargeModel: 'flat',
+                metadata: { enabled: true },
+            },
+        ]).returning();
+
+        // Create Plan Families for Snap Flow
+        // Each tier (Basic, PRO, Premium) has its own plan family for versioning.
+        // When updating a plan, archive the old version and create a new one with incremented version in the same family.
+        console.log('Creating Snap Flow plan families...');
+        const [basicPlanFamily, proPlanFamily, premiumPlanFamily] = await db.insert(planFamilies).values([
+            {
+                id: '660e8400-e29b-41d4-a716-446655440201',
+                name: 'Snap Flow Basic',
+                planCode: 'SNAP_FLOW_BASIC',
+                metadata: { product: 'snap flow', tier: 'basic', description: 'Basic tier plan family for versioning' },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440202',
+                name: 'Snap Flow PRO',
+                planCode: 'SNAP_FLOW_PRO',
+                metadata: { product: 'snap flow', tier: 'pro', description: 'PRO tier plan family for versioning' },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440203',
+                name: 'Snap Flow Premium',
+                planCode: 'SNAP_FLOW_PREMIUM',
+                metadata: { product: 'snap flow', tier: 'premium', description: 'Premium tier plan family for versioning' },
+            },
+        ]).returning();
+
+        // Create Snap Flow Plans (version 1 for each tier)
+        // Each plan is linked to its plan family for versioning purposes.
+        // To update: archive current plan (status: 'archived') and create new plan with version 2 in same family.
+        console.log('Creating Snap Flow plans (v1)...');
+        const [basicPlan, proPlanSnap, premiumPlan] = await db.insert(plans).values([
+            {
+                id: '660e8400-e29b-41d4-a716-446655440301',
+                planFamilyId: basicPlanFamily.id,
+                name: 'Basic',
+                planCode: 'SNAP_FLOW_BASIC',
+                planType: 'standard',
+                version: 1,
+                status: 'published',
+                active: true,
+                metadata: { description: 'Perfect for small studios with basic needs', product: 'snap flow', tier: 'basic' },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440302',
+                planFamilyId: proPlanFamily.id,
+                name: 'PRO',
+                planCode: 'SNAP_FLOW_PRO',
+                planType: 'pro',
+                version: 1,
+                status: 'published',
+                active: true,
+                metadata: { description: 'For professional photographers and studios', product: 'snap flow', tier: 'pro' },
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440303',
+                planFamilyId: premiumPlanFamily.id,
+                name: 'Premium',
+                planCode: 'SNAP_FLOW_PREMIUM',
+                planType: 'enterprise',
+                version: 1,
+                status: 'published',
+                active: true,
+                metadata: { description: 'Complete solution with AI features for large studios', product: 'snap flow', tier: 'premium' },
+            },
+        ]).returning();
+
+        // Create Plan-Product Associations
+        console.log('Creating plan-product associations for Snap Flow...');
+        await db.insert(planProducts).values([
+            { planId: basicPlan.id, productId: snapFlowProduct.id },
+            { planId: proPlanSnap.id, productId: snapFlowProduct.id },
+            { planId: premiumPlan.id, productId: snapFlowProduct.id },
+        ]);
+
+        // Create Plan Features with configurations
+        console.log('Creating plan features for Snap Flow...');
+        
+        // Create a map for easy feature lookup by code
+        const featureMap = new Map(snapFlowFeatures.map(f => [f.code, f]));
+        const getFeature = (code: string) => {
+            const feature = featureMap.get(code);
+            if (!feature) {
+                throw new Error(`Feature with code '${code}' not found`);
+            }
+            return feature;
+        };
+
+        // Basic Plan Features
+        await db.insert(planFeatures).values([
+            // Studio Shops: 2
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('studio_shops').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: 2,
+                metadata: { description: '2 studio shops' },
+            },
+            // Indoor Billing: Unlimited
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('indoor_billing').id,
+                isActive: true,
+                featureType: 'boolean',
+                metadata: { unlimited: true },
+            },
+            // Outdoor Billing: Unlimited
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('outdoor_billing').id,
+                isActive: true,
+                featureType: 'boolean',
+                metadata: { unlimited: true },
+            },
+            // Photo Selection Albums: Unlimited
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('photo_selection_albums').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: null, // null means unlimited
+                metadata: { unlimited: true },
+            },
+            // File Storage: 100GB
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('file_storage').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: 100,
+                metadata: { unit: 'GB', description: '100GB storage' },
+            },
+            // Email Notifications
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('email_notifications').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Whatsapp Notifications
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('whatsapp_notifications').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Social Media Integration
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('social_media_integration').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Marketing Tools
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('marketing_tools').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Expense Management
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('expense_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Client Management
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('client_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Report Management
+            {
+                planId: basicPlan.id,
+                featureId: getFeature('report_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+        ]);
+
+        // PRO Plan Features
+        await db.insert(planFeatures).values([
+            // Studio Shops: 1
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('studio_shops').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: 1,
+                metadata: { description: '1 studio shop' },
+            },
+            // Indoor Billing: Unlimited
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('indoor_billing').id,
+                isActive: true,
+                featureType: 'boolean',
+                metadata: { unlimited: true },
+            },
+            // Outdoor Billing: Unlimited
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('outdoor_billing').id,
+                isActive: true,
+                featureType: 'boolean',
+                metadata: { unlimited: true },
+            },
+            // Photo Selection Albums: 2
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('photo_selection_albums').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: 2,
+                metadata: { description: '2 albums' },
+            },
+            // File Storage: 10GB
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('file_storage').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: 10,
+                metadata: { unit: 'GB', description: '10GB storage' },
+            },
+            // Email Notifications
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('email_notifications').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Expense Management
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('expense_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Client Management
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('client_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Report Management
+            {
+                planId: proPlanSnap.id,
+                featureId: getFeature('report_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+        ]);
+
+        // Premium Plan Features
+        await db.insert(planFeatures).values([
+            // Studio Shops: Unlimited
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('studio_shops').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: null, // null means unlimited
+                metadata: { unlimited: true },
+            },
+            // Indoor Billing: Unlimited
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('indoor_billing').id,
+                isActive: true,
+                featureType: 'boolean',
+                metadata: { unlimited: true },
+            },
+            // Outdoor Billing: Unlimited
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('outdoor_billing').id,
+                isActive: true,
+                featureType: 'boolean',
+                metadata: { unlimited: true },
+            },
+            // Photo Selection Albums: Unlimited
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('photo_selection_albums').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: null, // null means unlimited
+                metadata: { unlimited: true },
+            },
+            // File Storage: 1TB (1000GB)
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('file_storage').id,
+                isActive: true,
+                featureType: 'quota',
+                quotaLimit: 1000,
+                metadata: { unit: 'GB', description: '1TB storage' },
+            },
+            // Email Notifications
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('email_notifications').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Whatsapp Notifications
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('whatsapp_notifications').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // SMS Notifications
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('sms_notifications').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Social Media Integration
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('social_media_integration').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Expense Management
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('expense_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Client Management
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('client_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // Report Management
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('report_management').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // AI Assistant
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('ai_assistant').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+            // AI Image Assistant
+            {
+                planId: premiumPlan.id,
+                featureId: getFeature('ai_image_assistant').id,
+                isActive: true,
+                featureType: 'boolean',
+            },
+        ]);
+
+        // Create Prices for Snap Flow Plans
+        console.log('Creating prices for Snap Flow plans...');
+        const [basicPrice, proPriceSnap, premiumPrice] = await db.insert(prices).values([
+            {
+                id: '660e8400-e29b-41d4-a716-446655440401',
+                planId: basicPlan.id,
+                priceId: 'price_snap_flow_basic_001',
+                value: 199900, // $1999.00 in cents (or ₹1999 in paise)
+                currency: 'INR',
+                isActive: true,
+                description: 'Basic plan monthly subscription',
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440402',
+                planId: proPlanSnap.id,
+                priceId: 'price_snap_flow_pro_001',
+                value: 99900, // $999.00 in cents (or ₹999 in paise)
+                currency: 'INR',
+                isActive: true,
+                description: 'PRO plan monthly subscription',
+            },
+            {
+                id: '660e8400-e29b-41d4-a716-446655440403',
+                planId: premiumPlan.id,
+                priceId: 'price_snap_flow_premium_001',
+                value: 499900, // $4999.00 in cents (or ₹4999 in paise)
+                currency: 'INR',
+                isActive: true,
+                description: 'Premium plan monthly subscription',
+            },
+        ]).returning();
+
+        // Create Recurring Charge Periods
+        console.log('Creating recurring charge periods for Snap Flow...');
+        await db.insert(recurringChargePeriods).values([
+            {
+                priceId: basicPrice.id,
+                recurringChargePeriodId: 'rcp_snap_flow_basic_001',
+                chargeFrequency: 'monthly',
+                startDateTime: new Date('2024-01-01'),
+                numberOfPeriods: null, // Indefinite
+            },
+            {
+                priceId: proPriceSnap.id,
+                recurringChargePeriodId: 'rcp_snap_flow_pro_001',
+                chargeFrequency: 'monthly',
+                startDateTime: new Date('2024-01-01'),
+                numberOfPeriods: null, // Indefinite
+            },
+            {
+                priceId: premiumPrice.id,
+                recurringChargePeriodId: 'rcp_snap_flow_premium_001',
+                chargeFrequency: 'monthly',
+                startDateTime: new Date('2024-01-01'),
+                numberOfPeriods: null, // Indefinite
+            },
+        ]);
+
+        // Create Trial Periods
+        console.log('Creating trial periods for Snap Flow...');
+        await db.insert(trialPeriods).values([
+            {
+                planId: basicPlan.id,
+                timePeriodId: 'trial_snap_flow_basic_001',
+                name: '14-day trial',
+                value: 14,
+            },
+            {
+                planId: proPlanSnap.id,
+                timePeriodId: 'trial_snap_flow_pro_001',
+                name: '14-day trial',
+                value: 14,
+            },
+            {
+                planId: premiumPlan.id,
+                timePeriodId: 'trial_snap_flow_premium_001',
+                name: '30-day trial',
+                value: 30,
+            },
+        ]);
+
+        // Create Renewal Definitions
+        console.log('Creating renewal definitions for Snap Flow...');
+        await db.insert(renewalDefinitions).values([
+            {
+                planId: basicPlan.id,
+                isExpirable: true,
+                isAutomaticRenewable: true,
+                renewCycleUnits: 'months',
+                gracePeriodName: '7-day grace period',
+                gracePeriodValue: 7,
+                maxRenewCycles: 0, // Unlimited
+            },
+            {
+                planId: proPlanSnap.id,
+                isExpirable: true,
+                isAutomaticRenewable: true,
+                renewCycleUnits: 'months',
+                gracePeriodName: '7-day grace period',
+                gracePeriodValue: 7,
+                maxRenewCycles: 0, // Unlimited
+            },
+            {
+                planId: premiumPlan.id,
+                isExpirable: true,
+                isAutomaticRenewable: true,
+                renewCycleUnits: 'months',
+                gracePeriodName: '14-day grace period',
+                gracePeriodValue: 14,
+                maxRenewCycles: 0, // Unlimited
+            },
+        ]);
+
+        console.log('✅ Snap Flow seed data created successfully!');
+
         console.log('✅ Database seed completed successfully!');
         console.log('\nSummary:');
         console.log(`- Created ${2} tenants`);
         console.log(`- Created ${4} accounts (including 1 parent-child relationship)`);
-        console.log(`- Created ${3} products`);
-        console.log(`- Created ${8} features`);
-        console.log(`- Created ${4} plans (Free, Standard, Pro, Enterprise)`);
-        console.log(`- Created ${8} plan-product associations`);
-        console.log(`- Created ${4} prices`);
-        console.log(`- Created ${4} recurring charge periods`);
-        console.log(`- Created ${3} trial periods`);
-        console.log(`- Created ${3} renewal definitions`);
+        console.log(`- Created ${4} products (3 original + 1 Snap Flow)`);
+        console.log(`- Created ${23} features (8 original + 15 Snap Flow)`);
+        console.log(`- Created ${3} plan families (Snap Flow: Basic, PRO, Premium - each for versioning)`);
+        console.log(`- Created ${7} plans (4 original + 3 Snap Flow v1: Basic, PRO, Premium)`);
+        console.log(`- Created ${11} plan-product associations (8 original + 3 Snap Flow)`);
+        console.log(`- Created ${7} prices (4 original + 3 Snap Flow)`);
+        console.log(`- Created ${7} recurring charge periods (4 original + 3 Snap Flow)`);
+        console.log(`- Created ${6} trial periods (3 original + 3 Snap Flow)`);
+        console.log(`- Created ${6} renewal definitions (3 original + 3 Snap Flow)`);
         console.log(`- Created ${3} subscriptions (2 active, 1 trial)`);
         console.log(`- Created ${3} payments (2 completed, 1 pending)`);
         console.log(`- Created ${4} payment transactions`);
