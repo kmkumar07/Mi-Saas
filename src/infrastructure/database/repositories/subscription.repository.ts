@@ -53,6 +53,15 @@ export class SubscriptionRepository implements ISubscriptionRepository {
         return results.map(r => this.toDomain(r));
     }
 
+    async findByTenantId(tenantId: string): Promise<Subscription[]> {
+        const results = await this.db
+            .select()
+            .from(subscriptions)
+            .where(eq(subscriptions.tenantId, tenantId));
+
+        return results.map(r => this.toDomain(r));
+    }
+
     async findActiveByTenantAndCustomer(tenantId: string, customerId?: string): Promise<Subscription[]> {
         const conditions = [
             eq(subscriptions.tenantId, tenantId),

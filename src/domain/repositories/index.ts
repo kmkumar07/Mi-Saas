@@ -8,3 +8,4 @@ export * from './subscription.repository';
 export * from './plan-feature-config.repository';
 export * from './payment-order.repository.interface';
 export * from './webhook-event.repository.interface';
+export * from './usage-event.repository';

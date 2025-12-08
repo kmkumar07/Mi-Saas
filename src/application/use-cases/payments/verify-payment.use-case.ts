@@ -37,6 +37,46 @@ export class VerifyPaymentUseCase {
                 payment = await this.paymentRepository.findById(paymentOrder.paymentId);
             }
 
+            // If payment doesn't exist but payment status is completed, create it
+            // This handles cases where webhook hasn't fired yet or failed
+            if (!payment && paymentStatus === 'completed') {
+                // Get payment details from Razorpay SDK
+                // Access the Razorpay instance from the gateway service
+                const razorpayGateway = this.paymentGateway as any;
+                let paymentEntity: any = null;
+                
+                // Fetch payment details from Razorpay
+                if (razorpayGateway.razorpay) {
+                    try {
+                        paymentEntity = await razorpayGateway.razorpay.payments.fetch(dto.paymentId);
+                    } catch (err) {
+                        console.error('[VERIFY PAYMENT] Error fetching payment details from Razorpay:', err);
+                        // Continue with minimal info if fetch fails
+                    }
+                }
+                
+                payment = new Payment({
+                    accountId: paymentOrder.accountId,
+                    subscriptionId: paymentOrder.subscriptionId,
+                    amount: paymentOrder.amount,
+                    currency: paymentOrder.currency,
+                    status: 'completed',
+                    gatewayPaymentId: dto.paymentId,
+                    gatewayCustomerId: paymentEntity?.customer_id || null,
+                    paymentMethod: paymentEntity?.method || 'card',
+                    paymentType: 'subscription',
+                    description: `Payment for order ${dto.orderId}`,
+                    metadata: {
+                        razorpayOrderId: dto.orderId,
+                        razorpayPaymentId: dto.paymentId,
+                        paymentEntity: paymentEntity || {},
+                        verifiedManually: true, // Mark that this was verified manually, not via webhook
+                    },
+                });
+
+                payment = await this.paymentRepository.create(payment);
+            }
+
             if (payment && paymentStatus === 'completed') {
                 // Update payment status if needed
                 if (payment.status !== 'completed') {

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import SubscriptionPage from '../views/SubscriptionPage.vue';
 import RegistrationPage from '../views/RegistrationPage.vue';
 import PaymentSuccessPage from '../views/PaymentSuccessPage.vue';
+import TenantDashboard from '../views/TenantDashboard.vue';
 
 const routes = [
   {
@@ -19,6 +20,12 @@ const routes = [
     path: '/payment-success',
     name: 'PaymentSuccess',
     component: PaymentSuccessPage,
+  },
+  {
+    path: '/dashboard/:tenantId?',
+    name: 'TenantDashboard',
+    component: TenantDashboard,
+    props: true,
   },
 ];
 

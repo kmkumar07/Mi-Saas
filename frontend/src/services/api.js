@@ -48,6 +48,11 @@ export const apiService = {
     return response.data;
   },
 
+  async getAllTenants() {
+    const response = await api.get('/tenants');
+    return response.data;
+  },
+
   async getTenant(id) {
     const response = await api.get(`/tenants/${id}`);
     return response.data;
@@ -72,6 +77,12 @@ export const apiService = {
 
   async getPaymentStatus(paymentId) {
     const response = await api.get(`/api/payments/${paymentId}/status`);
+    return response.data;
+  },
+
+  // Tenant Dashboard
+  async getTenantDashboard(tenantId) {
+    const response = await api.get(`/tenants/${tenantId}/dashboard`);
     return response.data;
   },
 };

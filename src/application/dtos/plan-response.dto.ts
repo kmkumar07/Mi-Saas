@@ -2,6 +2,43 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PlanType, FeatureType, ChargeModel, ChargeFrequency } from '@domain/enums';
 
 /**
+ * Feature pricing tier response DTO
+ */
+export class FeaturePricingTierResponseDto {
+  @ApiPropertyOptional({ example: 'uuid' })
+  id?: string;
+
+  @ApiProperty({ example: 0 })
+  fromQuantity: number;
+
+  @ApiPropertyOptional({ example: 1000 })
+  toQuantity?: number | null;
+
+  @ApiProperty({ example: 100 })
+  pricePerUnit: number;
+
+  @ApiProperty({ example: 'INR' })
+  currency: string;
+}
+
+/**
+ * Plan feature configuration response DTO
+ */
+export class PlanFeatureConfigResponseDto {
+  @ApiProperty({ example: true })
+  isActive: boolean;
+
+  @ApiPropertyOptional({ example: 10, description: 'Quota limit for QUOTA type features' })
+  quotaLimit?: number;
+
+  @ApiPropertyOptional({ 
+    type: [FeaturePricingTierResponseDto],
+    description: 'Pricing tiers for METERED type features'
+  })
+  pricingTiers?: FeaturePricingTierResponseDto[];
+}
+
+/**
  * Feature response DTO
  */
 export class FeatureResponseDto {
@@ -25,6 +62,12 @@ export class FeatureResponseDto {
 
   @ApiPropertyOptional({ example: 'https://api.example.com/track' })
   serviceUrl?: string;
+
+  @ApiPropertyOptional({ 
+    type: PlanFeatureConfigResponseDto,
+    description: 'Plan-specific feature configuration (quota limits, pricing tiers, etc.)'
+  })
+  planFeatureConfig?: PlanFeatureConfigResponseDto;
 }
 
 /**

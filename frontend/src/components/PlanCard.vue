@@ -31,7 +31,7 @@
         <svg class="checkmark" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>{{ feature }}</span>
+        <span v-html="feature"></span>
       </div>
     </div>
 
@@ -137,6 +137,57 @@ const features = computed(() => {
     return ['Contact us for details'];
   }
 
+  // Use products/features from API if available
+  if (props.plan.products && props.plan.products.length > 0) {
+    const featureList = [];
+    props.plan.products.forEach(product => {
+      if (product.features && product.features.length > 0) {
+        product.features.forEach(feature => {
+          // Only include active features
+          if (feature.planFeatureConfig && !feature.planFeatureConfig.isActive) {
+            return;
+          }
+          
+          const featureName = feature.name || feature.description || feature.code;
+          let displayText = featureName;
+          
+          // Format based on feature type and plan-feature-config
+          if (feature.planFeatureConfig) {
+            const config = feature.planFeatureConfig;
+            
+            if (feature.featureType === 'quota') {
+              // For QUOTA features, show the quota limit
+              if (config.quotaLimit !== null && config.quotaLimit !== undefined) {
+                // Format the quota limit based on feature name
+                if (featureName.toLowerCase().includes('shop')) {
+                  displayText = `${featureName} (${config.quotaLimit} ${config.quotaLimit === 1 ? 'shop' : 'shops'})`;
+                } else if (featureName.toLowerCase().includes('user')) {
+                  displayText = `${featureName} (up to ${config.quotaLimit} users)`;
+                } else {
+                  displayText = `${featureName} (${config.quotaLimit})`;
+                }
+              } else {
+                // Unlimited quota
+                displayText = `${featureName} (Unlimited)`;
+              }
+            } else if (feature.featureType === 'metered' && config.pricingTiers && config.pricingTiers.length > 0) {
+              // For METERED features, show pricing tier info if available
+              const firstTier = config.pricingTiers[0];
+              const currency = firstTier.currency === 'INR' ? '₹' : firstTier.currency;
+              const pricePerUnit = (firstTier.pricePerUnit / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+              displayText = `${featureName} (${currency}${pricePerUnit} per unit)`;
+            }
+            // For BOOLEAN features, just show the name as-is
+          }
+          
+          featureList.push(displayText);
+        });
+      }
+    });
+    return featureList.length > 0 ? featureList : ['Contact us for details'];
+  }
+
+  // Fallback to metadata features if available
   if (props.plan.metadata?.features && Array.isArray(props.plan.metadata.features)) {
     return props.plan.metadata.features;
   }
@@ -169,19 +220,6 @@ const features = computed(() => {
       'Handle multi-currency transactions',
       'Set up automated payment reminders',
     ];
-  }
-  
-  // Fallback: use products/features from API if available
-  if (props.plan.products && props.plan.products.length > 0) {
-    const featureList = [];
-    props.plan.products.forEach(product => {
-      if (product.features && product.features.length > 0) {
-        product.features.forEach(feature => {
-          featureList.push(feature.name || feature.description || feature.code);
-        });
-      }
-    });
-    return featureList.length > 0 ? featureList : ['Contact us for details'];
   }
   
   return ['Contact us for details'];

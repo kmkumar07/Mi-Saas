@@ -6,6 +6,8 @@ import {
     PRODUCT_REPOSITORY,
     IFeatureRepository,
     FEATURE_REPOSITORY,
+    IPlanFeatureConfigRepository,
+    PLAN_FEATURE_CONFIG_REPOSITORY,
 } from '@domain/repositories';
 import { Plan } from '@domain/entities';
 import {
@@ -16,6 +18,8 @@ import {
     RecurringChargePeriodResponseDto,
     RenewalDefinitionResponseDto,
     TimePeriodResponseDto,
+    PlanFeatureConfigResponseDto,
+    FeaturePricingTierResponseDto,
 } from '../../dtos/plan-response.dto';
 
 @Injectable()
@@ -27,6 +31,8 @@ export class GetPlanUseCase {
         private readonly productRepository: IProductRepository,
         @Inject(FEATURE_REPOSITORY)
         private readonly featureRepository: IFeatureRepository,
+        @Inject(PLAN_FEATURE_CONFIG_REPOSITORY)
+        private readonly planFeatureConfigRepository: IPlanFeatureConfigRepository,
     ) { }
 
     async execute(id: string): Promise<PlanResponseDto> {
@@ -40,6 +46,12 @@ export class GetPlanUseCase {
     }
 
     private async toResponseDto(plan: Plan): Promise<PlanResponseDto> {
+        // Fetch plan-feature-configs for this plan
+        const planFeatureConfigs = await this.planFeatureConfigRepository.findByPlanIds([plan.id!]);
+        const configsByFeatureId = new Map(
+            planFeatureConfigs.map(config => [config.featureId, config])
+        );
+
         // Fetch products for this plan
         const products = await Promise.all(
             plan.productIds.map(async (productId) => {
@@ -55,15 +67,19 @@ export class GetPlanUseCase {
                     id: product.id!,
                     name: product.name,
                     description: product.description,
-                    features: features.map(feature => ({
-                        id: feature.id!,
-                        name: feature.name,
-                        code: feature.code,
-                        description: feature.description,
-                        featureType: feature.featureType,
-                        chargeModel: feature.chargeModel,
-                        serviceUrl: feature.serviceUrl,
-                    } as FeatureResponseDto)),
+                    features: features.map(feature => {
+                        const config = configsByFeatureId.get(feature.id!);
+                        return {
+                            id: feature.id!,
+                            name: feature.name,
+                            code: feature.code,
+                            description: feature.description,
+                            featureType: feature.featureType,
+                            chargeModel: feature.chargeModel,
+                            serviceUrl: feature.serviceUrl,
+                            planFeatureConfig: config ? this.mapPlanFeatureConfig(config) : undefined,
+                        } as FeatureResponseDto;
+                    }),
                 } as ProductResponseDto;
             })
         );
@@ -123,6 +139,20 @@ export class GetPlanUseCase {
             status: plan.status,
             metadata: plan.metadata,
             createdAt: plan.createdAt,
+        };
+    }
+
+    private mapPlanFeatureConfig(config: any): PlanFeatureConfigResponseDto {
+        return {
+            isActive: config.isActive,
+            quotaLimit: config.quotaLimit,
+            pricingTiers: config.pricingTiers?.map((tier: any) => ({
+                id: tier.id,
+                fromQuantity: tier.fromQuantity,
+                toQuantity: tier.toQuantity,
+                pricePerUnit: tier.pricePerUnit,
+                currency: tier.currency,
+            } as FeaturePricingTierResponseDto)),
         };
     }
 }

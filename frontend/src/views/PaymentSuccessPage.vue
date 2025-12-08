@@ -40,7 +40,11 @@
           <button @click="goToHome" class="btn btn-primary">
             Return to Plans
           </button>
-          <button @click="viewDashboard" class="btn btn-secondary">
+          <button 
+            v-if="subscriptionStore.tenantId" 
+            @click="viewDashboard" 
+            class="btn btn-secondary"
+          >
             View Dashboard
           </button>
         </div>
@@ -95,8 +99,11 @@ const goToHome = () => {
 };
 
 const viewDashboard = () => {
-  // In a real app, this would navigate to the user dashboard
-  alert('Dashboard feature coming soon!');
+  if (subscriptionStore.tenantId) {
+    router.push(`/dashboard/${subscriptionStore.tenantId}`);
+  } else {
+    router.push('/dashboard');
+  }
 };
 </script>
 

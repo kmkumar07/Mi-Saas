@@ -6,6 +6,8 @@ import {
     PRODUCT_REPOSITORY,
     IFeatureRepository,
     FEATURE_REPOSITORY,
+    IPlanFeatureConfigRepository,
+    PLAN_FEATURE_CONFIG_REPOSITORY,
 } from '@domain/repositories';
 import { Plan } from '@domain/entities';
 import {
@@ -16,6 +18,8 @@ import {
     RecurringChargePeriodResponseDto,
     RenewalDefinitionResponseDto,
     TimePeriodResponseDto,
+    PlanFeatureConfigResponseDto,
+    FeaturePricingTierResponseDto,
 } from '../../dtos/plan-response.dto';
 
 @Injectable()
@@ -27,6 +31,8 @@ export class GetPlansByFamilyUseCase {
         private readonly productRepository: IProductRepository,
         @Inject(FEATURE_REPOSITORY)
         private readonly featureRepository: IFeatureRepository,
+        @Inject(PLAN_FEATURE_CONFIG_REPOSITORY)
+        private readonly planFeatureConfigRepository: IPlanFeatureConfigRepository,
     ) { }
 
     async execute(planFamilyId: string): Promise<PlanResponseDto[]> {
@@ -43,12 +49,24 @@ export class GetPlansByFamilyUseCase {
             return index === self.findIndex(p => p.planCode === plan.planCode);
         });
 
+        // Fetch all plan-feature-configs for all plans at once for efficiency
+        const planIds = latestPlans.map(p => p.id!);
+        const allPlanFeatureConfigs = await this.planFeatureConfigRepository.findByPlanIds(planIds);
+        const configsByPlanIdAndFeatureId = new Map<string, Map<string, any>>();
+        
+        for (const config of allPlanFeatureConfigs) {
+            if (!configsByPlanIdAndFeatureId.has(config.planId)) {
+                configsByPlanIdAndFeatureId.set(config.planId, new Map());
+            }
+            configsByPlanIdAndFeatureId.get(config.planId)!.set(config.featureId, config);
+        }
+
         return Promise.all(
-            latestPlans.map(plan => this.toResponseDto(plan))
+            latestPlans.map(plan => this.toResponseDto(plan, configsByPlanIdAndFeatureId.get(plan.id!) || new Map()))
         );
     }
 
-    private async toResponseDto(plan: Plan): Promise<PlanResponseDto> {
+    private async toResponseDto(plan: Plan, configsByFeatureId: Map<string, any>): Promise<PlanResponseDto> {
         // Fetch products for this plan
         const products = await Promise.all(
             plan.productIds.map(async (productId: string) => {
@@ -64,15 +82,19 @@ export class GetPlansByFamilyUseCase {
                     id: product.id!,
                     name: product.name,
                     description: product.description,
-                    features: features.map(feature => ({
-                        id: feature.id!,
-                        name: feature.name,
-                        code: feature.code,
-                        description: feature.description,
-                        featureType: feature.featureType,
-                        chargeModel: feature.chargeModel,
-                        serviceUrl: feature.serviceUrl,
-                    } as FeatureResponseDto)),
+                    features: features.map(feature => {
+                        const config = configsByFeatureId.get(feature.id!);
+                        return {
+                            id: feature.id!,
+                            name: feature.name,
+                            code: feature.code,
+                            description: feature.description,
+                            featureType: feature.featureType,
+                            chargeModel: feature.chargeModel,
+                            serviceUrl: feature.serviceUrl,
+                            planFeatureConfig: config ? this.mapPlanFeatureConfig(config) : undefined,
+                        } as FeatureResponseDto;
+                    }),
                 } as ProductResponseDto;
             })
         );
@@ -132,6 +154,20 @@ export class GetPlansByFamilyUseCase {
             status: plan.status,
             metadata: plan.metadata,
             createdAt: plan.createdAt,
+        };
+    }
+
+    private mapPlanFeatureConfig(config: any): PlanFeatureConfigResponseDto {
+        return {
+            isActive: config.isActive,
+            quotaLimit: config.quotaLimit,
+            pricingTiers: config.pricingTiers?.map((tier: any) => ({
+                id: tier.id,
+                fromQuantity: tier.fromQuantity,
+                toQuantity: tier.toQuantity,
+                pricePerUnit: tier.pricePerUnit,
+                currency: tier.currency,
+            } as FeaturePricingTierResponseDto)),
         };
     }
 }

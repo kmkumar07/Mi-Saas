@@ -7,7 +7,8 @@ import { ProductRepository } from '@infrastructure/database/repositories/product
 import { ProductVersionRepository } from '@infrastructure/database/repositories/product-version.repository';
 import { FeatureRepository } from '@infrastructure/database/repositories/feature.repository';
 import { SubscriptionRepository } from '@infrastructure/database/repositories/subscription.repository';
-import { PLAN_REPOSITORY, PLAN_FAMILY_REPOSITORY, PRODUCT_REPOSITORY, PRODUCT_VERSION_REPOSITORY, FEATURE_REPOSITORY, SUBSCRIPTION_REPOSITORY } from '@domain/repositories';
+import { PlanFeatureConfigRepository } from '@infrastructure/database/repositories/plan-feature-config.repository';
+import { PLAN_REPOSITORY, PLAN_FAMILY_REPOSITORY, PRODUCT_REPOSITORY, PRODUCT_VERSION_REPOSITORY, FEATURE_REPOSITORY, SUBSCRIPTION_REPOSITORY, PLAN_FEATURE_CONFIG_REPOSITORY } from '@domain/repositories';
 import { PlanResponseMapper } from '@application/mappers/plan-response.mapper';
 import { ProductMapper } from '@infrastructure/mappers/product.mapper';
 import { FeatureMapper } from '@infrastructure/mappers/feature.mapper';
@@ -59,6 +60,10 @@ import { PlanFamiliesController } from '@presentation/controllers/plan-families.
         {
             provide: SUBSCRIPTION_REPOSITORY,
             useClass: SubscriptionRepository,
+        },
+        {
+            provide: PLAN_FEATURE_CONFIG_REPOSITORY,
+            useClass: PlanFeatureConfigRepository,
         },
         // Application Mappers
         PlanResponseMapper,
