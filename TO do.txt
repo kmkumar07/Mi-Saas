@@ -115,7 +115,7 @@ async function requireFeature(featureCode) {
  
 
 5. create thh clone mechnism to update the plans .
-6.based on recurring period we need to enable in recurrent  payment provider
+6.based on recurring period we need to enable in recurrent  payment provider - hybrid => save payment token in account .
 7.recoincaltion .
 8.trial period
 9.grace period
