@@ -438,19 +438,19 @@ const loadUpgradePlans = async (dashboard) => {
       return;
     }
 
-    // Find current plan's family rank
-    const currentPlanFamilyId = currentPlan.planFamilyId || 
-      sortedPlanFamilies.find(f => f.planCode === currentPlan.planCode)?.id;
-    const currentPlanFamilyRank = currentPlanFamilyId ? (familyRankMap.get(currentPlanFamilyId) || 0) : 0;
+      // Find current plan's family rank
+      const currentPlanFamilyId = currentPlan.planFamilyId || 
+        sortedPlanFamilies.find(f => f.planCode === currentPlan.planCode)?.id;
+      const currentPlanFamilyRank = currentPlanFamilyId ? (familyRankMap.get(currentPlanFamilyId) || 0) : 0;
 
     // Filter plans that are published/active (show ALL plans, not just upgrades)
-    const availablePlans = allPlans.filter(
+      const availablePlans = allPlans.filter(
       plan => (plan.status === 'published' || plan.status === 'active')
-    );
+      );
 
     // Process all plans and determine their relationship to current subscription
     const allPlansList = [];
-    for (const plan of availablePlans) {
+      for (const plan of availablePlans) {
       const planFamilyRank = plan.familyRank || 0;
       const isCurrent = plan.id === primarySubscription.planId;
       const isHigherRank = planFamilyRank > currentPlanFamilyRank;

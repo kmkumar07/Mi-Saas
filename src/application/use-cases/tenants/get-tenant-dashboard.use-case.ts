@@ -89,22 +89,22 @@ export class GetTenantDashboardUseCase {
 
             if (activePlans.length > 0) {
                 // Get all product IDs from active plans only
-                const productIds = new Set<string>();
+            const productIds = new Set<string>();
                 for (const plan of activePlans) {
-                    if (plan.products) {
-                        plan.products.forEach(product => productIds.add(product.id));
-                    }
+                if (plan.products) {
+                    plan.products.forEach(product => productIds.add(product.id));
                 }
+            }
 
-                // Get all features for these products
-                const allFeatures: any[] = [];
-                for (const productId of productIds) {
-                    const features = await this.featureRepository.findByProductId(productId);
-                    allFeatures.push(...features);
-                }
+            // Get all features for these products
+            const allFeatures: any[] = [];
+            for (const productId of productIds) {
+                const features = await this.featureRepository.findByProductId(productId);
+                allFeatures.push(...features);
+            }
 
                 // Get current usage for the billing period
-                const now = new Date();
+            const now = new Date();
                 const periodStart = activeSubscriptions[0]?.currentPeriodStart || new Date();
                 const aggregatedUsage = await this.usageEventRepository.getAggregatedUsage(
                     tenantId,
@@ -116,34 +116,34 @@ export class GetTenantDashboardUseCase {
                 // Get plan feature configs from ACTIVE plans only
                 const planFeatureConfigs = await this.planFeatureConfigRepository.findByPlanIds(activePlanIds);
 
-                // Convert aggregated usage array to a map for easy lookup
-                const usageMap = new Map<string, number>();
-                for (const usage of aggregatedUsage) {
-                    usageMap.set(usage.featureCode.toUpperCase(), usage.totalQuantity);
-                }
+            // Convert aggregated usage array to a map for easy lookup
+            const usageMap = new Map<string, number>();
+            for (const usage of aggregatedUsage) {
+                usageMap.set(usage.featureCode.toUpperCase(), usage.totalQuantity);
+            }
 
-                // Build feature usage array
-                for (const feature of allFeatures) {
+            // Build feature usage array
+            for (const feature of allFeatures) {
                     // Find configs for this feature from active plans
                     const configsForFeature = planFeatureConfigs.filter(cfg => cfg.featureId === feature.id);
                     
                     // Use the first available config (prioritize active ones)
                     const config = configsForFeature.find(cfg => cfg.isAvailable()) || configsForFeature[0];
 
-                    const used = usageMap.get(feature.code.toUpperCase()) || 0;
-                    const limit = config?.quotaLimit;
-                    const isUnlimited = limit === null || limit === undefined;
+                const used = usageMap.get(feature.code.toUpperCase()) || 0;
+                const limit = config?.quotaLimit;
+                const isUnlimited = limit === null || limit === undefined;
 
-                    featureUsage.push({
-                        featureId: feature.id!,
-                        featureName: feature.name,
-                        featureCode: feature.code,
-                        featureDescription: feature.description,
-                        used,
-                        limit: limit,
-                        isUnlimited,
-                        featureType: feature.featureType,
-                    });
+                featureUsage.push({
+                    featureId: feature.id!,
+                    featureName: feature.name,
+                    featureCode: feature.code,
+                    featureDescription: feature.description,
+                    used,
+                    limit: limit,
+                    isUnlimited,
+                    featureType: feature.featureType,
+                });
                 }
             }
         }
