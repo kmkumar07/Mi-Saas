@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Plan, Product, Feature, PlanFeatureConfig, PlanFamily } from '@domain/entities';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { eq } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { ProductMapper } from '../mappers/product.mapper';
 import { FeatureMapper } from '../mappers/feature.mapper';
@@ -23,6 +24,7 @@ import { Price } from '@domain/value-objects/price.vo';
 import { RenewalDefinition } from '@domain/value-objects/renewal-definition.vo';
 import { TimePeriod } from '@domain/value-objects/time-period.vo';
 import { FeaturePricingTier } from '@domain/value-objects';
+import { randomUUID } from 'crypto';
 
 export interface PlanAggregatePersistenceResult {
     plan: Plan;
@@ -213,96 +215,104 @@ export class PlanPersistenceService {
         plan: Plan,
         productIds: string[],
     ): Promise<Plan> {
-        // Save price-related tables
-        const priceId = await this.savePriceWithRecurringCharge(tx, plan.price);
-
-        // Save renewal definition (if exists)
-        const renewalDefinitionId = plan.renewalDefinition
-            ? await this.saveRenewalDefinition(tx, plan.renewalDefinition)
-            : undefined;
-
-        // Save trial period (if exists)
-        const trialPeriodId = plan.trialPeriod
-            ? await this.saveTimePeriod(tx, plan.trialPeriod)
-            : undefined;
-
-        // Save plan
+        // Save plan first to get planId (required for prices table, renewal definitions, and trial periods)
         const planData = this.planMapper.toPersistence(plan);
         const planRow = await tx
             .insert(plansTable)
             .values({
                 ...planData,
-                priceId,
-                renewalDefinitionId,
-                trialPeriodId,
             })
             .returning();
+
+        // Save trial period (if exists) - needs planId
+        if (plan.trialPeriod) {
+            await this.saveTimePeriod(tx, plan.trialPeriod, planRow[0].id);
+        }
+
+        // Save renewal definition (if exists) - needs planId
+        // Note: renewal_definitions table has planId, not the other way around
+        if (plan.renewalDefinition) {
+            await this.saveRenewalDefinition(tx, plan.renewalDefinition, planRow[0].id);
+        }
+
+        // Save price-related tables (now that we have planId)
+        const priceId = await this.savePriceWithRecurringCharge(tx, plan.price, planRow[0].id);
+
+        // Update plan with priceId if needed (if plans table has priceId column)
+        // Note: Based on schema, plans table doesn't seem to have priceId, so this might not be needed
+        // But keeping it for compatibility with plan mapper
 
         // Save plan-product relationships
         await this.savePlanProductRelationships(tx, planRow[0].id, productIds);
 
-        // Map back to domain
+        // Map back to domain (pass productIds to satisfy validation)
         return this.planMapper.toDomain(
             planRow[0],
             plan.price,
             plan.renewalDefinition,
             plan.trialPeriod,
+            productIds, // Pass productIds to satisfy Plan entity validation
         );
     }
 
     /**
      * Saves price with recurring charge period
+     * Requires planId to be provided (plan must be saved first)
      */
     private async savePriceWithRecurringCharge(
         tx: any,
         price: Price,
+        planId: string,
     ): Promise<string> {
-        // Save recurring charge period
-        const recurringChargePeriodRow = await tx
-            .insert(recurringChargePeriodsTable)
-            .values({
-                chargeFrequency: price.recurringChargePeriod.chargeFrequency,
-                startDateTime: price.recurringChargePeriod.startDateTime,
-                numberOfPeriods: price.recurringChargePeriod.numberOfPeriods,
-            })
-            .returning();
+        // Generate priceId (varchar field required by prices table)
+        const priceIdString = `price_${randomUUID().replace(/-/g, '')}`;
 
-        // Save price
+        // Save price first (recurringChargePeriod needs priceId from prices table)
         const priceRow = await tx
             .insert(pricesTable)
             .values({
+                planId: planId, // Required: prices table has planId as not null
+                priceId: priceIdString, // Required: prices table has priceId as not null varchar
                 value: price.value,
                 currency: price.currency,
-                recurringChargePeriodId: recurringChargePeriodRow[0].id,
                 isActive: price.isActive,
                 description: price.description,
             })
             .returning();
+
+        // Save recurring charge period with priceId (references prices.id)
+        await tx
+            .insert(recurringChargePeriodsTable)
+            .values({
+                priceId: priceRow[0].id, // UUID reference to prices.id
+                chargeFrequency: price.recurringChargePeriod.chargeFrequency,
+                startDateTime: price.recurringChargePeriod.startDateTime,
+                numberOfPeriods: price.recurringChargePeriod.numberOfPeriods,
+            });
 
         return priceRow[0].id;
     }
 
     /**
      * Saves renewal definition with grace period
+     * Requires planId to be provided (plan must be saved first)
      */
     private async saveRenewalDefinition(
         tx: any,
         renewalDefinition: RenewalDefinition,
+        planId: string,
     ): Promise<string> {
-        // Save grace period
-        const gracePeriodId = await this.saveTimePeriod(
-            tx,
-            renewalDefinition.gracePeriod,
-        );
-
-        // Save renewal definition
+        // Save renewal definition with grace period name and value directly
+        // (schema stores gracePeriodName and gracePeriodValue, not a separate time period)
         const renewalRow = await tx
             .insert(renewalDefinitionsTable)
             .values({
+                planId: planId, // Required: renewal_definitions table has planId as not null
                 isExpirable: renewalDefinition.isExpirable,
                 isAutomaticRenewable: renewalDefinition.isAutomaticRenewable,
                 renewCycleUnits: renewalDefinition.renewCycleUnits,
-                gracePeriodId,
+                gracePeriodName: renewalDefinition.gracePeriod.name, // Required: not null
+                gracePeriodValue: renewalDefinition.gracePeriod.value, // Required: not null
                 maxRenewCycles: renewalDefinition.maxRenewCycles,
             })
             .returning();
@@ -311,12 +321,14 @@ export class PlanPersistenceService {
     }
 
     /**
-     * Saves time period
+     * Saves time period (trial period)
+     * Requires planId to be provided (plan must be saved first)
      */
-    private async saveTimePeriod(tx: any, timePeriod: TimePeriod): Promise<string> {
+    private async saveTimePeriod(tx: any, timePeriod: TimePeriod, planId: string): Promise<string> {
         const timePeriodRow = await tx
             .insert(trialPeriodsTable)
             .values({
+                planId: planId, // Required: trial_periods table has planId as not null
                 name: timePeriod.name,
                 value: timePeriod.value,
             })

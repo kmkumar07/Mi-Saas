@@ -1,0 +1,107 @@
+POST https://mini-saas.com/usage
+{
+  "tenantId": "TENANT_X",
+  "customerId": "CUSTOMER_123",
+  "featureCode": "ATTACHMENTS_MB",
+  "usage": 5
+}
+
+
+
+
+{
+  "features": {
+    "ATTACHMENTS": true,
+    "TAGS": false,
+    "AI_TODO": true
+  },
+  "usage": {
+    "ATTACHMENTS_MB": { "used": 450, "limit": 500 },
+    "AI_TODO_CALLS": { "used": 3, "limit": 10 }
+  }
+}
+
+
+import express from "express";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+
+// Cache entitlements in RAM for 5 minutes
+const entitlementCache = new Map();
+
+async function fetchEntitlements(tenantId, customerId) {
+  const key = `${tenantId}:${customerId}`;
+  
+  if (entitlementCache.has(key)) {
+    const { expires, data } = entitlementCache.get(key);
+    if (Date.now() < expires) return data;
+  }
+
+  const res = await fetch(`${process.env.MINI_SAAS_URL}/entitlements/${tenantId}/${customerId}`, {
+    headers: {
+      "x-api-key": process.env.MINI_SAAS_KEY,
+      "x-tenant-id": tenantId
+    }
+  });
+
+  const data = await res.json();
+  entitlementCache.set(key, {
+    expires: Date.now() + 5 * 60 * 1000,
+    data
+  });
+
+  return data;
+}
+async function requireFeature(featureCode) {
+    return async (req, res, next) => {
+      const tenantId = req.headers["x-tenant-id"];
+      const customerId = req.headers["x-customer-id"];
+  
+      const entitlements = await fetchEntitlements(tenantId, customerId);
+  
+      if (!entitlements.features[featureCode]) {
+        return res.status(403).json({
+          message: "Upgrade to use this feature",
+          requiredFeature: featureCode
+        });
+      }
+  
+      next();
+    };
+  }
+  
+  app.post("/todo/tags", requireFeature("TAGS"), (req, res) => {
+    res.json({ success: true });
+  });
+  app.post("/todo/add-customer", requireFeature("ADD_CUSTOMER"), async (req, res) => {
+    // Upload file logic (skip)
+  
+    // Send usage update
+    await fetch(`${process.env.MINI_SAAS_URL}/usage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.MINI_SAAS_KEY,
+        "x-tenant-id": req.headers["x-tenant-id"],
+      },
+      body: JSON.stringify({
+        tenantId: req.headers["x-tenant-id"],
+        customerId: req.headers["x-customer-id"],
+        featureCode: "ATTACHMENTS_MB",
+        usage: 5
+      })
+    });
+  
+    res.json({ message: "File uploaded" });
+  });
+  
+
+
+  1.upgrade plans -> versioning -> publishing plans
+  2.create payment module for the subscription 
+  3.create prorate or upgrade plan logic (low priority)
+  

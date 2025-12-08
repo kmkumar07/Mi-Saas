@@ -368,7 +368,7 @@ export const usageEvents = pgTable('usage_events', {
     tenantId: uuid('tenant_id')
         .references(() => tenants.id, { onDelete: 'cascade' })
         .notNull(),
-    customerId: uuid('customer_id').notNull(),
+    customerId: uuid('customer_id'), // Optional - can track usage at tenant level
     subscriptionId: uuid('subscription_id')
         .references(() => subscriptions.id, { onDelete: 'set null' }),
     featureCode: varchar('feature_code', { length: 100 }).notNull(),

@@ -5,7 +5,7 @@ import { IPlanRepository, PLAN_REPOSITORY } from '@domain/repositories';
 import { IProductRepository, PRODUCT_REPOSITORY } from '@domain/repositories';
 import { IFeatureRepository, FEATURE_REPOSITORY } from '@domain/repositories';
 import { IPlanFeatureConfigRepository, PLAN_FEATURE_CONFIG_REPOSITORY } from '@domain/repositories/plan-feature-config.repository';
-import { EntitlementsResponseDto, FeatureEntitlement, UsageInfo, FeaturePricingTierInfo } from '../../dtos/usage.dto';
+import { EntitlementsResponseDto, UsageEntry } from '../../dtos/usage.dto';
 import { FeatureType } from '@domain/enums';
 
 @Injectable()
@@ -71,55 +71,71 @@ export class GetEntitlementsUseCase {
         const planFeatureConfigs = await this.planFeatureConfigRepository.findByPlanIds(planIds);
 
         // 6. Build entitlements response
-        const features: Record<string, FeatureEntitlement> = {};
-        const usage: Record<string, UsageInfo> = {};
+        // Format: features as Record<string, boolean> and usage as Record<string, { used: number, limit: number }>
+        const features: Record<string, boolean> = {};
+        const usage: Record<string, UsageEntry> = {};
 
         for (const feature of allFeatures) {
-            const featureCode = feature.code;
+            // Convert feature code to uppercase to match user's expected format (e.g., "ATTACHMENTS", "AI_TODO")
+            const featureCode = feature.code.toUpperCase();
 
             // Find configs for this feature across all active plans
             const configsForFeature = planFeatureConfigs.filter(cfg => cfg.featureId === feature.id);
             const anyActive = configsForFeature.some(cfg => cfg.isAvailable());
 
             if (!anyActive) {
+                // Feature is not enabled in any plan
+                features[featureCode] = false;
                 continue;
             }
 
             const primaryConfig = configsForFeature[0];
+            const isEnabled = primaryConfig.isActive;
 
-            if (feature.featureType === FeatureType.BOOLEAN) {
-                features[featureCode] = {
-                    enabled: true,
-                };
-            }
+            // Set feature enabled/disabled status
+            features[featureCode] = isEnabled;
 
+            // Handle QUOTA features - add to usage with limit
             if (feature.featureType === FeatureType.QUOTA) {
-                const limit = primaryConfig.quotaLimit;
-                features[featureCode] = {
-                    enabled: true,
+                const limit = primaryConfig.quotaLimit || 0;
+                const usageData = aggregatedUsage.find(u => u.featureCode.toLowerCase() === feature.code.toLowerCase());
+                const used = usageData?.totalQuantity || 0;
+
+                usage[featureCode] = {
+                    used,
                     limit,
                 };
             }
 
+            // Handle METERED features - add to usage if there's a limit
             if (feature.featureType === FeatureType.METERED) {
-                const usageData = aggregatedUsage.find(u => u.featureCode === featureCode);
+                const usageData = aggregatedUsage.find(u => u.featureCode.toLowerCase() === feature.code.toLowerCase());
                 const used = usageData?.totalQuantity || 0;
 
-                const pricingTiers: FeaturePricingTierInfo[] = primaryConfig.pricingTiers.map(tier => ({
-                    fromQuantity: tier.fromQuantity,
-                    toQuantity: tier.toQuantity ?? null,
-                    pricePerUnit: tier.pricePerUnit,
-                    currency: tier.currency,
-                }));
+                // For metered features, check if there's a quota limit or calculate from pricing tiers
+                let limit: number | undefined;
+                
+                // If there's a quota limit, use it
+                if (primaryConfig.quotaLimit) {
+                    limit = primaryConfig.quotaLimit;
+                } else if (primaryConfig.pricingTiers.length > 0) {
+                    // If there are pricing tiers, use the highest toQuantity as the limit
+                    const highestTier = primaryConfig.pricingTiers
+                        .filter(tier => tier.toQuantity !== null && tier.toQuantity !== undefined)
+                        .sort((a, b) => (b.toQuantity || 0) - (a.toQuantity || 0))[0];
+                    
+                    if (highestTier) {
+                        limit = highestTier.toQuantity || undefined;
+                    }
+                }
 
-                usage[featureCode] = {
-                    used,
-                };
-
-                features[featureCode] = {
-                    enabled: true,
-                    pricingTiers: pricingTiers.length > 0 ? pricingTiers : undefined,
-                };
+                // Only add to usage if there's a limit
+                if (limit !== undefined) {
+                    usage[featureCode] = {
+                        used,
+                        limit,
+                    };
+                }
             }
         }
 

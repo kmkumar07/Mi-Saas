@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 export interface UsageEventProps {
     id?: string;
     tenantId: string;
-    customerId: string;
+    customerId?: string; // Optional - can track usage at tenant level
     subscriptionId?: string;
     featureCode: string;
     quantity?: number;
@@ -15,7 +15,7 @@ export interface UsageEventProps {
 export class UsageEvent {
     private readonly _id: string;
     private readonly _tenantId: string;
-    private readonly _customerId: string;
+    private readonly _customerId?: string;
     private readonly _subscriptionId?: string;
     private readonly _featureCode: string;
     private readonly _quantity: number;
@@ -42,9 +42,7 @@ export class UsageEvent {
             throw new Error('Tenant ID is required');
         }
 
-        if (!props.customerId || props.customerId.trim() === '') {
-            throw new Error('Customer ID is required');
-        }
+        // customerId is optional - can track usage at tenant level
 
         if (!props.featureCode || props.featureCode.trim() === '') {
             throw new Error('Feature code is required');
@@ -69,7 +67,7 @@ export class UsageEvent {
         return this._tenantId;
     }
 
-    get customerId(): string {
+    get customerId(): string | undefined {
         return this._customerId;
     }
 

@@ -45,12 +45,14 @@ export class PlanMapper {
     /**
      * Converts database row to Plan domain entity
      * Requires pre-loaded value objects (price, renewal, trial)
+     * @param productIds - Product IDs associated with this plan (required for validation)
      */
     toDomain(
         row: any,
         price: Price,
         renewalDefinition?: RenewalDefinition,
         trialPeriod?: TimePeriod,
+        productIds: string[] = [],
     ): Plan {
         return new Plan({
             id: row.id,
@@ -58,7 +60,7 @@ export class PlanMapper {
             name: row.name,
             planCode: row.planCode,
             planType: row.planType,
-            productIds: [], // Will be loaded separately from planProducts table
+            productIds: productIds, // Use provided productIds (required for validation)
             price,
             renewalDefinition,
             trialPeriod,
