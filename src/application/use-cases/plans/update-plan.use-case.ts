@@ -61,74 +61,102 @@ export class UpdatePlanUseCase {
         let featureConfigs: PlanFeatureConfigInput[] = [];
         let finalPlan: Plan = updatedPlan;
 
-        if (updateDto.products) {
-            // Create new products and features for the updated plan
-            for (const productDto of updateDto.products) {
-                const product = new Product({
-                    tenantId: existingPlan.tenantId,
-                    name: productDto.name,
-                    description: productDto.description,
-                });
-                products.push(product);
+        // Determine which product IDs to use
+        const productIds = updateDto.productIds 
+            ? updateDto.productIds 
+            : (hasActiveSubscriptions 
+                ? updatedPlan.productIds 
+                : originalPlan.productIds);
 
-                const features: Feature[] = [];
-                for (const featureDto of productDto.features) {
-                    const feature = new Feature({
-                        productId: product.id,
-                        name: featureDto.name,
-                        code: featureDto.code,
-                        description: featureDto.description,
-                        featureType: featureDto.featureType,
-                        chargeModel: featureDto.chargeModel,
-                        serviceUrl: featureDto.serviceUrl,
-                    });
-                    features.push(feature);
-
-                    featureConfigs.push({
-                        featureCode: featureDto.code,
-                        isActive: featureDto.isActive,
-                        quotaLimit: featureDto.quotaLimit,
-                        pricingTiers: featureDto.pricingTiers,
-                    });
+        // Fetch existing products
+        products = await Promise.all(
+            productIds.map(async (productId) => {
+                const product = await this.productRepository.findById(productId);
+                if (!product) {
+                    throw new NotFoundException(`Product with ID ${productId} not found`);
                 }
-                productFeatures.set(product.id, features);
+                if (product.tenantId !== existingPlan.tenantId) {
+                    throw new Error(`Product ${productId} does not belong to tenant ${existingPlan.tenantId}`);
+                }
+                return product;
+            })
+        );
+
+        // Handle feature configurations if provided
+        if (updateDto.featureConfigs && updateDto.featureConfigs.length > 0) {
+            // Fetch features and validate they belong to selected products
+            const featureIds = updateDto.featureConfigs.map(cfg => cfg.featureId);
+            const features: Feature[] = [];
+            const featureMap = new Map<string, Feature>();
+            const productIdsSet = new Set(productIds);
+
+            for (const featureId of featureIds) {
+                const feature = await this.featureRepository.findById(featureId);
+                if (!feature) {
+                    throw new NotFoundException(`Feature with ID ${featureId} not found`);
+                }
+                
+                // Validate feature belongs to one of the selected products
+                if (!productIdsSet.has(feature.productId)) {
+                    throw new Error(
+                        `Feature ${featureId} (${feature.name}) does not belong to any of the selected products`
+                    );
+                }
+
+                features.push(feature);
+                featureMap.set(featureId, feature);
             }
 
-            // Create a new plan instance with the updated product IDs
+            // Organize features by product
+            for (const product of products) {
+                const productFeaturesList = features.filter(f => f.productId === product.id);
+                if (productFeaturesList.length > 0) {
+                    productFeatures.set(product.id, productFeaturesList);
+                }
+            }
+
+            // Convert feature configs to PlanFeatureConfigInput format
+            featureConfigs = updateDto.featureConfigs.map(cfg => {
+                const feature = featureMap.get(cfg.featureId);
+                if (!feature) {
+                    throw new Error(`Feature ${cfg.featureId} not found in fetched features`);
+                }
+                return {
+                    featureId: cfg.featureId,
+                    featureCode: feature.code,
+                    isActive: cfg.isActive,
+                    quotaLimit: cfg.quotaLimit,
+                    pricingTiers: cfg.pricingTiers,
+                };
+            });
+        } else {
+            // No feature configs provided, fetch all features from products
+            for (const product of products) {
+                const features = await this.featureRepository.findByProductId(product.id!);
+                if (features.length > 0) {
+                    productFeatures.set(product.id!, features);
+                }
+            }
+        }
+
+        // Update plan with new product IDs if they were changed
+        if (updateDto.productIds) {
             finalPlan = new Plan({
                 ...updatedPlan.toProps(),
                 productIds: products.map(p => p.id),
             });
-        } else {
-            // Use existing products
-            const productIds = hasActiveSubscriptions
-                ? updatedPlan.productIds
-                : originalPlan.productIds;
-
-            products = await Promise.all(
-                productIds.map(async (productId) => {
-                    const product = await this.productRepository.findById(productId);
-                    if (!product) {
-                        throw new Error(`Product ${productId} not found`);
-                    }
-                    return product;
-                })
-            );
-
-            for (const product of products) {
-                const features = await this.featureRepository.findByProductId(product.id!);
-                productFeatures.set(product.id!, features);
-            }
         }
 
         // Step 7: Persist changes (infrastructure concern)
         let savedPlan: Plan;
+        const hasProductOrFeatureChanges = updateDto.productIds || (updateDto.featureConfigs && updateDto.featureConfigs.length > 0);
+        
         if (hasActiveSubscriptions) {
             // Save archived original plan
             await this.planRepository.update(originalPlan);
 
             // Save new version with products and features
-            const saved = await this.planPersistenceService.savePlanAggregate(
+            const saved = await this.planPersistenceService.savePlanWithExistingEntities(
                 finalPlan,
                 products,
                 productFeatures,
@@ -139,9 +167,9 @@ export class UpdatePlanUseCase {
             productFeatures = saved.productFeatures;
         } else {
             // Update existing plan directly
-            if (updateDto.products) {
-                // If products are being updated, use persistence service to save everything
-                const saved = await this.planPersistenceService.savePlanAggregate(
+            if (hasProductOrFeatureChanges) {
+                // If products or features are being updated, use persistence service
+                const saved = await this.planPersistenceService.savePlanWithExistingEntities(
                     finalPlan,
                     products,
                     productFeatures,
@@ -151,7 +179,7 @@ export class UpdatePlanUseCase {
                 products = saved.products;
                 productFeatures = saved.productFeatures;
             } else {
-                // No product changes, just update the plan
+                // No product/feature changes, just update the plan
                 savedPlan = await this.planRepository.update(finalPlan);
             }
         }

@@ -1,69 +1,26 @@
-import { IsNotEmpty, IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsInt, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsInt, Min, IsArray, ValidateNested, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { FeatureType, ChargeModel } from '@domain/enums';
 
 /**
- * DTO for creating a feature inline within product creation
- * @deprecated Features should be created separately using CreateFeatureDto.
- * This DTO is kept for backward compatibility but should not be used in new code.
+ * DTO for configuring a feature in a plan
+ * This includes the feature ID and the plan-specific values (quota, pricing tiers, etc.)
  */
-export class CreateFeatureInlineDto {
+export class PlanFeatureConfigDto {
     @ApiProperty({
-        description: 'Feature name',
-        example: 'API Calls',
+        description: 'Feature ID to include in this plan',
+        example: '550e8400-e29b-41d4-a716-446655440000',
     })
     @IsNotEmpty()
     @IsString()
-    name: string;
-
-    @ApiProperty({
-        description: 'Unique feature code',
-        example: 'api_calls',
-    })
-    @IsNotEmpty()
-    @IsString()
-    code: string;
-
-    @ApiPropertyOptional({
-        description: 'Feature description',
-        example: 'Track API usage',
-    })
-    @IsOptional()
-    @IsString()
-    description?: string;
-
-    @ApiProperty({
-        description: 'Type of feature',
-        enum: FeatureType,
-        example: FeatureType.METERED,
-    })
-    @IsNotEmpty()
-    @IsEnum(FeatureType)
-    featureType: FeatureType;
-
-    @ApiProperty({
-        description: 'Charge model for the feature',
-        enum: ChargeModel,
-        example: ChargeModel.PER_API_CALL,
-    })
-    @IsNotEmpty()
-    @IsEnum(ChargeModel)
-    chargeModel: ChargeModel;
-
-    @ApiPropertyOptional({
-        description: 'Service URL for the feature',
-        example: 'https://api.example.com/track',
-    })
-    @IsOptional()
-    @IsString()
-    serviceUrl?: string;
+    featureId: string;
 
     @ApiPropertyOptional({
         description: 'Whether this feature is active for the plan (defaults to true)',
         example: true,
     })
     @IsOptional()
+    @IsBoolean()
     isActive?: boolean;
 
     @ApiPropertyOptional({
@@ -120,3 +77,4 @@ export class FeaturePricingTierDto {
     @IsString()
     currency?: string;
 }
+

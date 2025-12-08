@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, varchar, boolean, jsonb, timestamp, bigint, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, varchar, boolean, jsonb, timestamp, bigint, integer, pgEnum, unique } from 'drizzle-orm/pg-core';
 
 // ============================
 // ENUM DEFINITIONS
@@ -176,20 +176,38 @@ export const planStatusEnum = pgEnum('plan_status', [
     'draft',
 ]);
 
-export const plans = pgTable('plans', {
+export const planFamilies = pgTable('plan_families', {
     id: uuid('id').primaryKey().defaultRandom(),
     tenantId: uuid('tenant_id')
         .references(() => tenants.id, { onDelete: 'cascade' })
         .notNull(),
     name: text('name').notNull(),
-    planCode: text('plan_code').notNull(), // Grouping identifier for versioning (e.g., 'PRO_PLAN')
+    planCode: text('plan_code').notNull(),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+    tenantPlanCodeUnique: unique().on(table.tenantId, table.planCode),
+}));
+
+export const plans = pgTable('plans', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+        .references(() => tenants.id, { onDelete: 'cascade' })
+        .notNull(),
+    planFamilyId: uuid('plan_family_id')
+        .references(() => planFamilies.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    planCode: text('plan_code').notNull(), // Denormalized from plan_families for fast lookups
     planType: planTypeEnum('plan_type').notNull(),
     version: integer('version').notNull().default(1),
     status: planStatusEnum('status').default('active').notNull(),
     active: boolean('active').default(true).notNull(), // Deprecated, use status instead
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+    planFamilyVersionUnique: unique().on(table.planFamilyId, table.version),
+}));
 
 // Plan-Product junction table (many-to-many relationship)
 export const planProducts = pgTable('plan_products', {
@@ -414,6 +432,9 @@ export type NewProduct = typeof products.$inferInsert;
 
 export type Feature = typeof features.$inferSelect;
 export type NewFeature = typeof features.$inferInsert;
+
+export type PlanFamily = typeof planFamilies.$inferSelect;
+export type NewPlanFamily = typeof planFamilies.$inferInsert;
 
 export type Plan = typeof plans.$inferSelect;
 export type NewPlan = typeof plans.$inferInsert;

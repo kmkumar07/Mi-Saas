@@ -10,13 +10,14 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PlanType } from '@domain/enums';
-import { CreateProductWithFeaturesDto } from './create-product-with-features.dto';
 import { PriceDto } from './price.dto';
 import { RenewalDefinitionDto } from './renewal-definition.dto';
 import { TimePeriodDto } from './time-period.dto';
+import { PlanFeatureConfigDto } from './plan-feature-config.dto';
 
 /**
- * DTO for creating a plan with products, features, pricing, and renewal configuration
+ * DTO for creating a plan with existing products and features
+ * Products and features should be created separately before creating a plan
  */
 export class CreatePlanDto {
     @ApiProperty({
@@ -28,19 +29,41 @@ export class CreatePlanDto {
     tenantId: string;
 
     @ApiProperty({
-        description: 'Products with features to include in this plan',
-        type: [CreateProductWithFeaturesDto],
+        description: 'Plan family ID (required)',
+        example: 'plan-family-uuid',
+    })
+    @IsNotEmpty()
+    @IsString()
+    planFamilyId: string;
+
+    @ApiProperty({
+        description: 'Product IDs to include in this plan',
+        type: [String],
+        example: ['550e8400-e29b-41d4-a716-446655440000', '660e8400-e29b-41d4-a716-446655440001'],
+    })
+    @IsArray()
+    @IsString({ each: true })
+    @IsNotEmpty({ each: true })
+    productIds: string[];
+
+    @ApiProperty({
+        description: 'Feature configurations for this plan (selective features with their values)',
+        type: [PlanFeatureConfigDto],
         example: [
             {
-                name: 'API Platform',
-                description: 'Full API access',
-                features: [
+                featureId: '770e8400-e29b-41d4-a716-446655440002',
+                isActive: true,
+                quotaLimit: 10000,
+            },
+            {
+                featureId: '880e8400-e29b-41d4-a716-446655440003',
+                isActive: true,
+                pricingTiers: [
                     {
-                        name: 'API Calls',
-                        code: 'api_calls',
-                        description: 'Track API usage',
-                        featureType: 'metered',
-                        chargeModel: 'per_api_call',
+                        fromQuantity: 0,
+                        toQuantity: 1000,
+                        pricePerUnit: 10,
+                        currency: 'USD',
                     },
                 ],
             },
@@ -48,8 +71,8 @@ export class CreatePlanDto {
     })
     @IsArray()
     @ValidateNested({ each: true })
-    @Type(() => CreateProductWithFeaturesDto)
-    products: CreateProductWithFeaturesDto[];
+    @Type(() => PlanFeatureConfigDto)
+    featureConfigs: PlanFeatureConfigDto[];
 
     @ApiProperty({
         description: 'Plan name',

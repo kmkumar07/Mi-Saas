@@ -1,0 +1,49 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+/**
+ * DTO for plan family response
+ */
+export class PlanFamilyResponseDto {
+    @ApiProperty({
+        description: 'Plan family ID',
+        example: 'uuid',
+    })
+    id: string;
+
+    @ApiProperty({
+        description: 'Tenant ID',
+        example: 'tenant-uuid',
+    })
+    tenantId: string;
+
+    @ApiProperty({
+        description: 'Plan family name',
+        example: 'Premium Plan Family',
+    })
+    name: string;
+
+    @ApiProperty({
+        description: 'Plan code',
+        example: 'PREMIUM',
+    })
+    planCode: string;
+
+    @ApiPropertyOptional({
+        description: 'Metadata',
+        example: { description: 'Premium tier plans' },
+    })
+    metadata?: Record<string, any>;
+
+    @ApiProperty({
+        description: 'Creation timestamp',
+        example: '2025-01-01T00:00:00Z',
+    })
+    createdAt: Date;
+
+    @ApiProperty({
+        description: 'Last update timestamp',
+        example: '2025-01-01T00:00:00Z',
+    })
+    updatedAt: Date;
+}
+

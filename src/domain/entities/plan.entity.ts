@@ -5,8 +5,9 @@ import { Price, RenewalDefinition, TimePeriod } from '../value-objects';
 export interface PlanProps {
     id?: string;
     tenantId: string;
+    planFamilyId?: string; // Foreign key to plan_families table
     name: string;
-    planCode?: string;
+    planCode?: string; // Denormalized from plan family for fast lookups
     planType: PlanType;
     productIds: string[]; // Array of product IDs associated with this plan
     price: Price;
@@ -26,6 +27,7 @@ export interface PlanProps {
 export class Plan {
     private readonly _id: string;
     private readonly _tenantId: string;
+    private _planFamilyId?: string;
     private _name: string;
     private _planCode: string;
     private _planType: PlanType;
@@ -43,7 +45,10 @@ export class Plan {
         this.validate(props);
         this._id = props.id || randomUUID();
         this._tenantId = props.tenantId;
+        this._planFamilyId = props.planFamilyId;
         this._name = props.name;
+        // If planFamilyId is provided but planCode is not, it should be set from family
+        // For now, generate from name if not provided (will be synced from family during persistence)
         this._planCode = props.planCode || this.generatePlanCode(props.name);
         this._planType = props.planType;
         this._productIds = props.productIds;
@@ -86,6 +91,7 @@ export class Plan {
     // Getters
     get id(): string { return this._id; }
     get tenantId(): string { return this._tenantId; }
+    get planFamilyId(): string | undefined { return this._planFamilyId; }
     get name(): string { return this._name; }
     get planCode(): string { return this._planCode; }
     get planType(): PlanType { return this._planType; }
@@ -106,11 +112,12 @@ export class Plan {
      * The current plan instance should be archived after calling this.
      */
     createNewVersion(changes: Partial<PlanProps>): Plan {
-        // Create new plan with same planCode but new ID
+        // Create new plan with same planFamilyId and planCode but new ID
         return new Plan({
             ...this.toProps(),
             ...changes,
             id: undefined, // Will generate new ID
+            planFamilyId: this._planFamilyId, // Keep same family
             planCode: this._planCode, // Keep same plan code
             status: 'active',
             createdAt: new Date(),
@@ -127,6 +134,7 @@ export class Plan {
         return {
             id: this._id,
             tenantId: this._tenantId,
+            planFamilyId: this._planFamilyId,
             name: this._name,
             planCode: this._planCode,
             planType: this._planType,
@@ -140,6 +148,14 @@ export class Plan {
             createdAt: this._createdAt,
             version: this._version,
         };
+    }
+
+    /**
+     * Sets the plan family ID and syncs planCode from family
+     */
+    setPlanFamily(planFamilyId: string, planCode: string): void {
+        this._planFamilyId = planFamilyId;
+        this._planCode = planCode;
     }
 
     // Legacy / mutation methods

@@ -6,11 +6,17 @@ export interface PlanFamilyProps {
     tenantId: string;
     name: string;
     planCode: string;
+    metadata?: Record<string, any>;
+    createdAt?: Date;
+    updatedAt?: Date;
     plans?: Plan[];
 }
 
 /**
- * Aggregate root representing a family of plan versions.
+ * Entity representing a family of plan versions.
+ * 
+ * PlanFamily is now a first-class entity that can be persisted independently.
+ * It groups related plan versions together via the planCode.
  *
  * Invariants and business rules about versioning and upgrades
  * are enforced here instead of in application services.
@@ -20,6 +26,9 @@ export class PlanFamily {
     private readonly _tenantId: string;
     private _name: string;
     private _planCode: string;
+    private _metadata?: Record<string, any>;
+    private readonly _createdAt: Date;
+    private _updatedAt: Date;
     private _plans: Plan[] = [];
 
     private constructor(props: PlanFamilyProps) {
@@ -27,7 +36,18 @@ export class PlanFamily {
         this._tenantId = props.tenantId;
         this._name = props.name;
         this._planCode = props.planCode;
+        this._metadata = props.metadata;
+        this._createdAt = props.createdAt ?? new Date();
+        this._updatedAt = props.updatedAt ?? new Date();
         this._plans = props.plans ?? [];
+    }
+
+    /**
+     * Creates a new PlanFamily entity (without plans).
+     * Plans should be added separately.
+     */
+    static create(props: Omit<PlanFamilyProps, 'plans'>): PlanFamily {
+        return new PlanFamily(props);
     }
 
     /**
@@ -69,7 +89,56 @@ export class PlanFamily {
     get tenantId(): string { return this._tenantId; }
     get name(): string { return this._name; }
     get planCode(): string { return this._planCode; }
+    get metadata(): Record<string, any> | undefined { return this._metadata; }
+    get createdAt(): Date { return this._createdAt; }
+    get updatedAt(): Date { return this._updatedAt; }
     get plans(): Plan[] { return [...this._plans]; }
+
+    /**
+     * Updates the family name
+     */
+    updateName(newName: string): void {
+        if (!newName || newName.trim() === '') {
+            throw new Error('Plan family name cannot be empty');
+        }
+        this._name = newName;
+        this._updatedAt = new Date();
+    }
+
+    /**
+     * Updates the plan code
+     */
+    updatePlanCode(newPlanCode: string): void {
+        if (!newPlanCode || newPlanCode.trim() === '') {
+            throw new Error('Plan code cannot be empty');
+        }
+        this._planCode = newPlanCode;
+        this._updatedAt = new Date();
+    }
+
+    /**
+     * Updates metadata
+     */
+    updateMetadata(metadata: Record<string, any>): void {
+        this._metadata = { ...this._metadata, ...metadata };
+        this._updatedAt = new Date();
+    }
+
+    /**
+     * Converts entity to props for persistence
+     */
+    toProps(): PlanFamilyProps {
+        return {
+            id: this._id,
+            tenantId: this._tenantId,
+            name: this._name,
+            planCode: this._planCode,
+            metadata: this._metadata,
+            createdAt: this._createdAt,
+            updatedAt: this._updatedAt,
+            plans: this._plans,
+        };
+    }
 
     /**
      * The latest plan version in this family (highest version number).

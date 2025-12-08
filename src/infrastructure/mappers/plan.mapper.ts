@@ -15,22 +15,30 @@ export class PlanMapper {
     toPersistence(plan: Plan): {
         id: string;
         tenantId: string;
+        planFamilyId?: string;
         name: string;
+        planCode: string;
         planType: string;
+        version: number;
         priceId?: string;
         renewalDefinitionId?: string;
         trialPeriodId?: string;
         active: boolean;
+        status: 'active' | 'archived' | 'draft';
         metadata?: Record<string, any>;
         createdAt?: Date;
     } {
         return {
             id: plan.id,
             tenantId: plan.tenantId,
+            planFamilyId: plan.planFamilyId,
             name: plan.name,
+            planCode: plan.planCode,
             planType: plan.planType,
+            version: plan.version,
             // IDs will be set after persisting related entities
             active: plan.active,
+            status: plan.status,
             metadata: plan.metadata,
             createdAt: plan.createdAt,
         };
@@ -49,15 +57,19 @@ export class PlanMapper {
         return new Plan({
             id: row.id,
             tenantId: row.tenantId,
+            planFamilyId: row.planFamilyId,
             name: row.name,
+            planCode: row.planCode,
             planType: row.planType,
             productIds: [], // Will be loaded separately from planProducts table
             price,
             renewalDefinition,
             trialPeriod,
             active: row.active,
+            status: row.status,
             metadata: row.metadata,
             createdAt: row.createdAt,
+            version: row.version,
         });
     }
 }

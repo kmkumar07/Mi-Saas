@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Plan, Product, Feature, PlanFeatureConfig } from '@domain/entities';
+import { Plan, Product, Feature, PlanFeatureConfig, PlanFamily } from '@domain/entities';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../database/schema';
 import { ProductMapper } from '../mappers/product.mapper';
 import { FeatureMapper } from '../mappers/feature.mapper';
 import { PlanMapper } from '../mappers/plan.mapper';
+import { IPlanFamilyRepository, PLAN_FAMILY_REPOSITORY } from '@domain/repositories';
 import {
     products as productsTable,
     features as featuresTable,
@@ -30,7 +31,8 @@ export interface PlanAggregatePersistenceResult {
 }
 
 export interface PlanFeatureConfigInput {
-    featureCode: string;
+    featureId?: string; // Use featureId when working with existing features
+    featureCode?: string; // Use featureCode for backward compatibility
     isActive?: boolean;
     quotaLimit?: number;
     pricingTiers?: {
@@ -53,11 +55,14 @@ export class PlanPersistenceService {
         private readonly productMapper: ProductMapper,
         private readonly featureMapper: FeatureMapper,
         private readonly planMapper: PlanMapper,
+        @Inject(PLAN_FAMILY_REPOSITORY)
+        private readonly planFamilyRepository: IPlanFamilyRepository,
     ) { }
 
     /**
      * Persists complete plan aggregate in a single transaction
      * All operations succeed together or fail together (atomicity)
+     * @deprecated Use savePlanWithExistingEntities when working with existing products/features
      */
     async savePlanAggregate(
         plan: Plan,
@@ -89,6 +94,54 @@ export class PlanPersistenceService {
                 plan: savedPlan,
                 products: savedProducts,
                 productFeatures: savedProductFeatures,
+            };
+        });
+    }
+
+    /**
+     * Persists plan with existing products and features (does not create new products/features)
+     * Links existing entities to the plan and configures features
+     * Uses provided planFamilyId and ensures planCode is synced from family
+     */
+    async savePlanWithExistingEntities(
+        plan: Plan,
+        products: Product[],
+        productFeatures: Map<string, Feature[]>,
+        featureConfigs: PlanFeatureConfigInput[] = [],
+    ): Promise<PlanAggregatePersistenceResult> {
+        return await this.db.transaction(async (tx) => {
+            // 0. Load plan family by ID and sync planCode
+            if (!plan.planFamilyId) {
+                throw new Error('PlanFamilyId is required');
+            }
+
+            const planFamily = await this.planFamilyRepository.findById(plan.planFamilyId);
+            if (!planFamily) {
+                throw new Error(`PlanFamily with ID ${plan.planFamilyId} not found`);
+            }
+
+            // Sync planCode from family to plan
+            plan.setPlanFamily(planFamily.id, planFamily.planCode);
+
+            // 1. Save plan with all related tables (products already exist, just link them)
+            const savedPlan = await this.savePlan(
+                tx,
+                plan,
+                products.map(p => p.id!),
+            );
+
+            // 2. Save per-plan feature configuration (availability, quotas, pricing tiers)
+            await this.savePlanFeatureConfigurations(
+                tx,
+                savedPlan,
+                productFeatures,
+                featureConfigs,
+            );
+
+            return {
+                plan: savedPlan,
+                products: products,
+                productFeatures: productFeatures,
             };
         });
     }
@@ -297,16 +350,47 @@ export class PlanPersistenceService {
         savedProductFeatures: Map<string, Feature[]>,
         featureConfigs: PlanFeatureConfigInput[],
     ): Promise<void> {
+        // Create maps for both featureId and featureCode lookups
+        const configById = new Map<string, PlanFeatureConfigInput>();
         const configByCode = new Map<string, PlanFeatureConfigInput>();
+        
         for (const cfg of featureConfigs) {
-            configByCode.set(cfg.featureCode, cfg);
+            if (cfg.featureId) {
+                configById.set(cfg.featureId, cfg);
+            }
+            if (cfg.featureCode) {
+                configByCode.set(cfg.featureCode, cfg);
+            }
         }
 
-        for (const [, features] of savedProductFeatures) {
-            for (const feature of features) {
-                const cfg = configByCode.get(feature.code);
+        // Track which features have been configured to avoid duplicates
+        const configuredFeatureIds = new Set<string>();
 
-                const tiers = (cfg?.pricingTiers ?? []).map(tier =>
+        // If using featureId, only configure explicitly listed features
+        // If using featureCode, configure all features from products (backward compatibility)
+        const useFeatureIdMode = featureConfigs.length > 0 && featureConfigs.some(cfg => cfg.featureId);
+
+        if (useFeatureIdMode) {
+            // Only configure features explicitly listed by featureId
+            for (const cfg of featureConfigs) {
+                if (!cfg.featureId) continue;
+                
+                // Find the feature in the savedProductFeatures map
+                let feature: Feature | undefined;
+                for (const [, features] of savedProductFeatures) {
+                    feature = features.find(f => f.id === cfg.featureId);
+                    if (feature) break;
+                }
+
+                if (!feature) {
+                    throw new Error(`Feature with ID ${cfg.featureId} not found in provided features`);
+                }
+
+                if (configuredFeatureIds.has(feature.id!)) {
+                    continue;
+                }
+
+                const tiers = (cfg.pricingTiers ?? []).map(tier =>
                     new FeaturePricingTier({
                         fromQuantity: tier.fromQuantity,
                         toQuantity: tier.toQuantity,
@@ -319,10 +403,12 @@ export class PlanPersistenceService {
                     planId: plan.id,
                     featureId: feature.id!,
                     featureType: feature.featureType,
-                    isActive: cfg?.isActive ?? true,
-                    quotaLimit: cfg?.quotaLimit,
+                    isActive: cfg.isActive ?? true,
+                    quotaLimit: cfg.quotaLimit,
                     pricingTiers: tiers,
                 });
+
+                configuredFeatureIds.add(feature.id!);
 
                 // Persist plan_features row
                 const [planFeatureRow] = await tx
@@ -350,6 +436,69 @@ export class PlanPersistenceService {
                             pricePerUnit: tier.pricePerUnit,
                             currency: tier.currency,
                         });
+                    }
+                }
+            }
+        } else {
+            // Backward compatibility: configure all features from products using featureCode
+            for (const [, features] of savedProductFeatures) {
+                for (const feature of features) {
+                    // Skip if already configured
+                    if (configuredFeatureIds.has(feature.id!)) {
+                        continue;
+                    }
+
+                    // Try to find config by featureCode
+                    const cfg = configByCode.get(feature.code);
+
+                    // Create config for all features (backward compatibility)
+                    const tiers = (cfg?.pricingTiers ?? []).map(tier =>
+                        new FeaturePricingTier({
+                            fromQuantity: tier.fromQuantity,
+                            toQuantity: tier.toQuantity,
+                            pricePerUnit: tier.pricePerUnit,
+                            currency: tier.currency ?? plan.price.currency,
+                        }),
+                    );
+
+                    const planFeatureConfig = new PlanFeatureConfig({
+                        planId: plan.id,
+                        featureId: feature.id!,
+                        featureType: feature.featureType,
+                        isActive: cfg?.isActive ?? true,
+                        quotaLimit: cfg?.quotaLimit,
+                        pricingTiers: tiers,
+                    });
+
+                    configuredFeatureIds.add(feature.id!);
+
+                    // Persist plan_features row
+                    const [planFeatureRow] = await tx
+                        .insert(planFeaturesTable)
+                        .values({
+                            planId: planFeatureConfig.planId,
+                            featureId: planFeatureConfig.featureId,
+                            isActive: planFeatureConfig.isActive,
+                            featureType: planFeatureConfig.featureType,
+                            quotaLimit: planFeatureConfig.quotaLimit,
+                            metadata: planFeatureConfig.metadata,
+                        })
+                        .returning();
+
+                    // Persist pricing tiers if any
+                    const pricingTiers = planFeatureConfig.pricingTiers;
+                    if (pricingTiers.length > 0) {
+                        let index = 0;
+                        for (const tier of pricingTiers) {
+                            await tx.insert(featurePricingTiersTable).values({
+                                planFeatureId: planFeatureRow.id,
+                                tierIndex: index++,
+                                fromQuantity: tier.fromQuantity,
+                                toQuantity: tier.toQuantity ?? null,
+                                pricePerUnit: tier.pricePerUnit,
+                                currency: tier.currency,
+                            });
+                        }
                     }
                 }
             }

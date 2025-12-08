@@ -11,6 +11,8 @@ import { CreateFeatureInlineDto } from './create-feature-inline.dto';
 
 /**
  * DTO for creating a product with features
+ * @deprecated Products and features should be created separately. Use CreateProductDto and CreateFeatureDto instead.
+ * This DTO is kept for backward compatibility but should not be used in new code.
  */
 export class CreateProductWithFeaturesDto {
     @ApiProperty({

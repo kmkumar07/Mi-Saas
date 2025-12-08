@@ -5,6 +5,7 @@ export interface IPlanRepository {
     findById(id: string): Promise<Plan | null>;
     findByTenantId(tenantId: string): Promise<Plan[]>;
     findByProductId(productId: string): Promise<Plan[]>;
+    findByPlanFamilyId(planFamilyId: string): Promise<Plan[]>;
     findAll(): Promise<Plan[]>;
     update(plan: Plan): Promise<Plan>;
     delete(id: string): Promise<void>;
