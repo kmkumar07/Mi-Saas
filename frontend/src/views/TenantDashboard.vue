@@ -10,6 +10,15 @@
         <button @click="loadDashboard" class="btn btn-primary">Retry</button>
       </div>
 
+      <!-- Toast Notification -->
+      <div v-if="notification.show" :class="['toast', `toast-${notification.type}`]">
+        <div class="toast-content">
+          <span class="toast-icon">{{ notification.type === 'success' ? '✅' : '❌' }}</span>
+          <span class="toast-message">{{ notification.message }}</span>
+        </div>
+        <button @click="notification.show = false" class="toast-close">×</button>
+      </div>
+
       <div v-else-if="dashboardData" class="dashboard-content">
         <!-- Header -->
         <div class="dashboard-header">
@@ -140,6 +149,79 @@
           </div>
         </div>
 
+        <!-- Available Plans for Upgrade Section -->
+        <div v-if="activeSubscriptions.length > 0" class="dashboard-section">
+          <h2>Upgrade Plans</h2>
+          <div v-if="loadingUpgradePlans" class="loading">
+            <p>Loading upgrade plans...</p>
+          </div>
+          <div v-else-if="upgradePlans.length === 0" class="empty-state">
+            <p>No upgrade plans available</p>
+          </div>
+          <div v-else class="upgrade-plans-grid">
+            <div
+              v-for="upgradePlan in upgradePlans"
+              :key="upgradePlan.plan.id"
+              class="upgrade-plan-card"
+            >
+              <div class="upgrade-plan-header">
+                <h3>{{ upgradePlan.plan.name }}</h3>
+                <div class="upgrade-plan-price">
+                  <span class="currency">{{ getCurrencySymbol(upgradePlan.plan.price?.currency) }}</span>
+                  <span class="amount">{{ formatPrice(upgradePlan.plan.price?.value || 0) }}</span>
+                  <span class="period">/ {{ getBillingPeriod(upgradePlan.plan) }}</span>
+                </div>
+              </div>
+              <div v-if="upgradePlan.proration" class="proration-info">
+                <div class="proration-item">
+                  <span class="label">Pro-rated Amount:</span>
+                  <span class="value highlight">
+                    {{ getCurrencySymbol(upgradePlan.plan.price?.currency) }}{{ formatPrice(upgradePlan.proration.amountDue) }}
+                  </span>
+                </div>
+                <div class="proration-item">
+                  <span class="label">Credit from current plan:</span>
+                  <span class="value">
+                    {{ getCurrencySymbol(upgradePlan.plan.price?.currency) }}{{ formatPrice(upgradePlan.proration.proratedCredit) }}
+                  </span>
+                </div>
+                <div class="proration-item">
+                  <span class="label">Days remaining:</span>
+                  <span class="value">{{ upgradePlan.proration.daysRemaining }} days</span>
+                </div>
+              </div>
+              <div class="upgrade-plan-details">
+                <div class="detail-item">
+                  <span class="label">Plan Code:</span>
+                  <span class="value">{{ upgradePlan.plan.planCode }}</span>
+                </div>
+                <div v-if="upgradePlan.plan.products && upgradePlan.plan.products.length > 0" class="products">
+                  <span class="label">Products:</span>
+                  <div class="products-list">
+                    <span
+                      v-for="product in upgradePlan.plan.products"
+                      :key="product.id"
+                      class="product-tag"
+                    >
+                      {{ product.name }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="upgrade-plan-actions">
+                <button
+                  @click="handleUpgrade(upgradePlan.subscription.id, upgradePlan.plan.id)"
+                  :disabled="upgrading === upgradePlan.plan.id"
+                  class="btn btn-upgrade"
+                >
+                  <span v-if="upgrading === upgradePlan.plan.id">Upgrading...</span>
+                  <span v-else>Upgrade Now</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Feature Usage Section -->
         <div class="dashboard-section">
           <h2>Feature Usage</h2>
@@ -240,6 +322,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { apiService } from '../services/api';
+import { razorpayService } from '../services/razorpay';
 
 const route = useRoute();
 const router = useRouter();
@@ -250,8 +333,27 @@ const error = ref(null);
 const tenants = ref([]);
 const loadingTenants = ref(false);
 const tenantsError = ref(null);
+const upgradePlans = ref([]);
+const loadingUpgradePlans = ref(false);
+const upgrading = ref(null);
+const notification = ref({ show: false, message: '', type: 'success' }); // 'success' or 'error'
+
+const showNotification = (message, type = 'success') => {
+  notification.value = { show: true, message, type };
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    notification.value.show = false;
+  }, 5000);
+};
 
 const tenantIdFromRoute = computed(() => route.params.tenantId);
+
+const activeSubscriptions = computed(() => {
+  if (!dashboardData.value) return [];
+  return dashboardData.value.subscriptions.filter(
+    sub => sub.status === 'active' || sub.status === 'trial'
+  );
+});
 
 const loadDashboard = async (tenantId) => {
   const id = tenantId || tenantIdFromRoute.value;
@@ -266,11 +368,207 @@ const loadDashboard = async (tenantId) => {
   try {
     const data = await apiService.getTenantDashboard(id);
     dashboardData.value = data;
+    // Load upgrade plans after dashboard is loaded
+    if (data.subscriptions.some(sub => sub.status === 'active' || sub.status === 'trial')) {
+      await loadUpgradePlans(data);
+    }
   } catch (err) {
     error.value = err.message || 'Failed to load dashboard';
     console.error('Error loading dashboard:', err);
   } finally {
     loading.value = false;
+  }
+};
+
+const loadUpgradePlans = async (dashboard) => {
+  loadingUpgradePlans.value = true;
+  upgradePlans.value = [];
+
+  try {
+    // Get all plan families
+    const planFamilies = await apiService.getPlanFamilies();
+    
+    // Get all plans from all families
+    const allPlansPromises = planFamilies.map(async (family) => {
+      try {
+        return await apiService.getPlansByFamily(family.id);
+      } catch (err) {
+        console.warn(`Could not fetch plans for plan family ${family.id}:`, err);
+        return [];
+      }
+    });
+    
+    const plansArrays = await Promise.all(allPlansPromises);
+    const allPlans = plansArrays.flat();
+
+    // Get active subscriptions
+    const activeSubs = dashboard.subscriptions.filter(
+      sub => sub.status === 'active' || sub.status === 'trial'
+    );
+
+    // For each active subscription, find upgradeable plans
+    const upgradePlansList = [];
+    for (const subscription of activeSubs) {
+      const currentPlan = dashboard.plans.find(p => p.id === subscription.planId);
+      if (!currentPlan) continue;
+
+      // Filter plans that are different from current plan
+      const availablePlans = allPlans.filter(
+        plan => plan.id !== subscription.planId && 
+        (plan.status === 'published' || plan.status === 'active')
+      );
+
+      // Calculate proration for each upgradeable plan
+      for (const plan of availablePlans) {
+        try {
+          // Get proration from backend for accurate calculation
+          const proration = await apiService.calculateProration(subscription.id, plan.id);
+          upgradePlansList.push({
+            subscription,
+            plan,
+            proration,
+          });
+        } catch (err) {
+          console.warn(`Could not calculate proration for plan ${plan.id}:`, err);
+          // Fallback to frontend calculation if backend fails
+          try {
+            const proration = calculateProration(subscription, currentPlan, plan);
+            upgradePlansList.push({
+              subscription,
+              plan,
+              proration: { ...proration, currency: plan.price?.currency || 'INR' },
+            });
+          } catch (fallbackErr) {
+            console.warn(`Frontend proration calculation also failed:`, fallbackErr);
+          }
+        }
+      }
+    }
+
+    // Remove duplicates (same plan for different subscriptions)
+    const uniquePlans = new Map();
+    for (const item of upgradePlansList) {
+      const key = item.plan.id;
+      if (!uniquePlans.has(key) || 
+          (uniquePlans.get(key).proration.amountDue > item.proration.amountDue)) {
+        uniquePlans.set(key, item);
+      }
+    }
+
+    upgradePlans.value = Array.from(uniquePlans.values());
+  } catch (err) {
+    console.error('Error loading upgrade plans:', err);
+  } finally {
+    loadingUpgradePlans.value = false;
+  }
+};
+
+const calculateProration = (subscription, currentPlan, newPlan) => {
+  const now = new Date();
+  const periodStart = new Date(subscription.currentPeriodStart);
+  const periodEnd = new Date(subscription.currentPeriodEnd);
+
+  // Calculate days
+  const totalPeriodMs = periodEnd.getTime() - periodStart.getTime();
+  const daysInPeriod = Math.ceil(totalPeriodMs / (1000 * 60 * 60 * 24));
+
+  const remainingMs = periodEnd.getTime() - now.getTime();
+  const daysRemaining = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+
+  // Get plan costs (in cents)
+  const currentPlanCost = currentPlan.price?.value || 0;
+  const newPlanCost = newPlan.price?.value || 0;
+
+  // Calculate prorated credit
+  const dailyRate = daysInPeriod > 0 ? currentPlanCost / daysInPeriod : 0;
+  const proratedCredit = Math.floor(dailyRate * daysRemaining);
+
+  // Calculate amount due
+  const amountDue = Math.max(0, newPlanCost - proratedCredit);
+
+  return {
+    currentPlanCost,
+    newPlanCost,
+    proratedCredit,
+    amountDue,
+    daysRemaining,
+    daysInPeriod,
+  };
+};
+
+const handleUpgrade = async (subscriptionId, newPlanId) => {
+  if (upgrading.value) return;
+
+  // Find the upgrade plan details for account info
+  const upgradePlan = upgradePlans.value.find(
+    up => up.subscription.id === subscriptionId && up.plan.id === newPlanId
+  );
+  if (!upgradePlan) {
+    showNotification('Upgrade plan details not found. Please refresh the page.', 'error');
+    return;
+  }
+
+  upgrading.value = newPlanId;
+  try {
+    // Step 1: Create payment order
+    const paymentOrder = await apiService.createUpgradePaymentOrder(subscriptionId, newPlanId);
+    
+    if (!paymentOrder || !paymentOrder.razorpayOrderId) {
+      throw new Error('Invalid payment order response');
+    }
+
+    // Step 2: Get account details for Razorpay checkout
+    const subscription = dashboardData.value.subscriptions.find(s => s.id === subscriptionId);
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    // Step 3: Open Razorpay checkout
+    try {
+      const paymentResponse = await razorpayService.openCheckout({
+        keyId: paymentOrder.keyId,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        razorpayOrderId: paymentOrder.razorpayOrderId,
+        name: 'AG SaaS',
+        description: `Upgrade subscription to ${upgradePlan.plan.name}`,
+        customerName: dashboardData.value.tenantName || '',
+        customerEmail: '', // We don't have email in dashboard, but Razorpay will work without it
+      });
+
+      // Step 4: Complete upgrade after payment
+      const result = await apiService.completeUpgrade(
+        subscriptionId,
+        paymentOrder.razorpayOrderId,
+        paymentResponse.razorpay_payment_id
+      );
+
+      showNotification(
+        `Upgrade successful! Pro-rated amount paid: ${getCurrencySymbol(result.currency)}${formatPrice(result.proratedAmount)}. Your subscription has been upgraded.`,
+        'success'
+      );
+
+      // Reload dashboard to show updated subscriptions
+      await loadDashboard();
+    } catch (paymentError) {
+      // Payment was cancelled or failed
+      if (paymentError.message.includes('cancelled')) {
+        showNotification('Payment was cancelled. Your subscription has not been upgraded.', 'error');
+      } else {
+        throw paymentError;
+      }
+    }
+  } catch (err) {
+    const errorMessage = err.message || 'Unknown error occurred';
+    console.error('Error upgrading subscription:', {
+      error: err,
+      subscriptionId,
+      newPlanId,
+      message: errorMessage,
+    });
+    showNotification(`Upgrade failed: ${errorMessage}. Please check the console for more details or contact support.`, 'error');
+  } finally {
+    upgrading.value = null;
   }
 };
 
@@ -767,6 +1065,210 @@ const formatDate = (date) => {
 
 .btn-primary:hover {
   background: #16a34a;
+}
+
+.upgrade-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.upgrade-plan-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  background: white;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.upgrade-plan-card:hover {
+  border-color: #22c55e;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+  transform: translateY(-2px);
+}
+
+.upgrade-plan-header {
+  margin-bottom: 16px;
+}
+
+.upgrade-plan-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.upgrade-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.upgrade-plan-price .currency {
+  font-size: 18px;
+  color: #22c55e;
+}
+
+.upgrade-plan-price .amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+.upgrade-plan-price .period {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.proration-info {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.proration-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.proration-item:last-child {
+  margin-bottom: 0;
+}
+
+.proration-item .label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.proration-item .value {
+  color: #111827;
+  font-weight: 600;
+}
+
+.proration-item .value.highlight {
+  color: #22c55e;
+  font-size: 16px;
+}
+
+.upgrade-plan-details {
+  margin-bottom: 20px;
+}
+
+.upgrade-plan-actions {
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-upgrade {
+  width: 100%;
+  background: #22c55e;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-upgrade:hover:not(:disabled) {
+  background: #16a34a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
+}
+
+.btn-upgrade:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Toast Notification Styles */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  min-width: 300px;
+  max-width: 500px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 10000;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-success {
+  background: #d1fae5;
+  border: 1px solid #86efac;
+  color: #065f46;
+}
+
+.toast-error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.toast-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
 </style>
 

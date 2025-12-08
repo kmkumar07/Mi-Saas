@@ -11,7 +11,38 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message || error.message || 'An error occurred';
+    // Extract error message from various possible locations
+    let message = 'An error occurred';
+    
+    if (error.response) {
+      // Server responded with error status
+      message = error.response.data?.message || 
+                error.response.data?.error || 
+                error.response.statusText ||
+                `Server error: ${error.response.status}`;
+      
+      // If there are validation errors, include them
+      if (error.response.data?.errors) {
+        const validationErrors = Array.isArray(error.response.data.errors)
+          ? error.response.data.errors.join(', ')
+          : JSON.stringify(error.response.data.errors);
+        message += ` - ${validationErrors}`;
+      }
+    } else if (error.request) {
+      // Request was made but no response received
+      message = 'No response from server. Please check your connection.';
+    } else {
+      // Something else happened
+      message = error.message || 'An unexpected error occurred';
+    }
+    
+    console.error('API Error:', {
+      message,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+    });
+    
     return Promise.reject(new Error(message));
   }
 );
@@ -83,6 +114,36 @@ export const apiService = {
   // Tenant Dashboard
   async getTenantDashboard(tenantId) {
     const response = await api.get(`/tenants/${tenantId}/dashboard`);
+    return response.data;
+  },
+
+  // Subscriptions
+  async calculateProration(subscriptionId, newPlanId) {
+    const response = await api.get(`/api/subscriptions/${subscriptionId}/proration`, {
+      params: { newPlanId },
+    });
+    return response.data;
+  },
+
+  async createUpgradePaymentOrder(subscriptionId, newPlanId) {
+    const response = await api.post(`/api/subscriptions/${subscriptionId}/upgrade/payment-order`, {
+      newPlanId,
+    });
+    return response.data;
+  },
+
+  async completeUpgrade(subscriptionId, orderId, paymentId) {
+    const response = await api.post(`/api/subscriptions/${subscriptionId}/upgrade/complete`, {
+      orderId,
+      paymentId,
+    });
+    return response.data;
+  },
+
+  async upgradeSubscription(subscriptionId, newPlanId) {
+    const response = await api.patch(`/api/subscriptions/${subscriptionId}/upgrade`, {
+      newPlanId,
+    });
     return response.data;
   },
 };
