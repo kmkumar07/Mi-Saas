@@ -3,7 +3,6 @@ import { Plan } from '../entities';
 export interface IPlanRepository {
     create(plan: Plan): Promise<Plan>;
     findById(id: string): Promise<Plan | null>;
-    findByTenantId(tenantId: string): Promise<Plan[]>;
     findByProductId(productId: string): Promise<Plan[]>;
     findByPlanFamilyId(planFamilyId: string): Promise<Plan[]>;
     findAll(): Promise<Plan[]>;

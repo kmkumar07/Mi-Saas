@@ -17,7 +17,6 @@ export class ProductRepository implements IProductRepository {
         const result = await this.db
             .insert(schema.products)
             .values({
-                tenantId: product.tenantId,
                 name: product.name,
                 description: product.description,
                 apiKey: product.apiKey,
@@ -37,15 +36,6 @@ export class ProductRepository implements IProductRepository {
             .limit(1);
 
         return result.length > 0 ? this.toDomain(result[0]) : null;
-    }
-
-    async findByTenantId(tenantId: string): Promise<Product[]> {
-        const results = await this.db
-            .select()
-            .from(schema.products)
-            .where(eq(schema.products.tenantId, tenantId));
-
-        return results.map((row) => this.toDomain(row));
     }
 
     async findAll(): Promise<Product[]> {
@@ -80,7 +70,6 @@ export class ProductRepository implements IProductRepository {
     private toDomain(row: schema.Product): Product {
         return new Product({
             id: row.id,
-            tenantId: row.tenantId,
             name: row.name,
             description: row.description ?? undefined,
             apiKey: row.apiKey ?? undefined,

@@ -11,12 +11,6 @@ export class PlanFamilyResponseDto {
     id: string;
 
     @ApiProperty({
-        description: 'Tenant ID',
-        example: 'tenant-uuid',
-    })
-    tenantId: string;
-
-    @ApiProperty({
         description: 'Plan family name',
         example: 'Premium Plan Family',
     })

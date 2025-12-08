@@ -3,7 +3,6 @@ import { Plan, PlanProps } from './plan.entity';
 
 export interface PlanFamilyProps {
     id?: string;
-    tenantId: string;
     name: string;
     planCode: string;
     metadata?: Record<string, any>;
@@ -23,7 +22,6 @@ export interface PlanFamilyProps {
  */
 export class PlanFamily {
     private readonly _id: string;
-    private readonly _tenantId: string;
     private _name: string;
     private _planCode: string;
     private _metadata?: Record<string, any>;
@@ -33,7 +31,6 @@ export class PlanFamily {
 
     private constructor(props: PlanFamilyProps) {
         this._id = props.id ?? randomUUID();
-        this._tenantId = props.tenantId;
         this._name = props.name;
         this._planCode = props.planCode;
         this._metadata = props.metadata;
@@ -60,7 +57,6 @@ export class PlanFamily {
         });
 
         return new PlanFamily({
-            tenantId: initialPlan.tenantId,
             name: initialPlan.name,
             planCode: initialPlan.planCode,
             plans: [initialPlan],
@@ -78,7 +74,6 @@ export class PlanFamily {
 
         const base = plans[0];
         return new PlanFamily({
-            tenantId: base.tenantId,
             name: base.name,
             planCode: base.planCode,
             plans,
@@ -86,7 +81,6 @@ export class PlanFamily {
     }
 
     get id(): string { return this._id; }
-    get tenantId(): string { return this._tenantId; }
     get name(): string { return this._name; }
     get planCode(): string { return this._planCode; }
     get metadata(): Record<string, any> | undefined { return this._metadata; }
@@ -130,7 +124,6 @@ export class PlanFamily {
     toProps(): PlanFamilyProps {
         return {
             id: this._id,
-            tenantId: this._tenantId,
             name: this._name,
             planCode: this._planCode,
             metadata: this._metadata,

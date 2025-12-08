@@ -11,7 +11,6 @@ export class ProductMapper {
      */
     toPersistence(product: Product): {
         id: string;
-        tenantId: string;
         name: string;
         description?: string;
         apiKey?: string;
@@ -21,7 +20,6 @@ export class ProductMapper {
     } {
         return {
             id: product.id,
-            tenantId: product.tenantId,
             name: product.name,
             description: product.description,
             apiKey: product.apiKey,
@@ -37,7 +35,6 @@ export class ProductMapper {
     toDomain(row: any): Product {
         return new Product({
             id: row.id,
-            tenantId: row.tenantId,
             name: row.name,
             description: row.description,
             apiKey: row.apiKey,

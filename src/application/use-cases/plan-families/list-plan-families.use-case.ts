@@ -10,8 +10,8 @@ export class ListPlanFamiliesUseCase {
         private readonly planFamilyRepository: IPlanFamilyRepository,
     ) { }
 
-    async execute(tenantId: string): Promise<PlanFamilyResponseDto[]> {
-        const planFamilies = await this.planFamilyRepository.findByTenantId(tenantId);
+    async execute(): Promise<PlanFamilyResponseDto[]> {
+        const planFamilies = await this.planFamilyRepository.findAll();
 
         return planFamilies.map(pf => this.toResponseDto(pf));
     }
@@ -19,7 +19,6 @@ export class ListPlanFamiliesUseCase {
     private toResponseDto(planFamily: PlanFamily): PlanFamilyResponseDto {
         return {
             id: planFamily.id,
-            tenantId: planFamily.tenantId,
             name: planFamily.name,
             planCode: planFamily.planCode,
             metadata: planFamily.metadata,

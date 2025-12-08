@@ -12,7 +12,6 @@ export class CreateProductUseCase {
 
     async execute(dto: CreateProductDto): Promise<Product> {
         const product = new Product({
-            tenantId: dto.tenantId,
             name: dto.name,
             description: dto.description,
             metadata: dto.metadata,

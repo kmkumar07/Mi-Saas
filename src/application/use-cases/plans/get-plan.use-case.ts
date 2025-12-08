@@ -111,7 +111,6 @@ export class GetPlanUseCase {
 
         return {
             id: plan.id!,
-            tenantId: plan.tenantId,
             name: plan.name,
             planCode: plan.planCode,
             planType: plan.planType,

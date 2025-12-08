@@ -4,7 +4,6 @@ import { Price, RenewalDefinition, TimePeriod } from '../value-objects';
 
 export interface PlanProps {
     id?: string;
-    tenantId: string;
     planFamilyId?: string; // Foreign key to plan_families table
     name: string;
     planCode?: string; // Denormalized from plan family for fast lookups
@@ -26,7 +25,6 @@ export interface PlanProps {
 
 export class Plan {
     private readonly _id: string;
-    private readonly _tenantId: string;
     private _planFamilyId?: string;
     private _name: string;
     private _planCode: string;
@@ -44,7 +42,6 @@ export class Plan {
     constructor(props: PlanProps) {
         this.validate(props);
         this._id = props.id || randomUUID();
-        this._tenantId = props.tenantId;
         this._planFamilyId = props.planFamilyId;
         this._name = props.name;
         // If planFamilyId is provided but planCode is not, it should be set from family
@@ -63,10 +60,6 @@ export class Plan {
     }
 
     private validate(props: PlanProps): void {
-        if (!props.tenantId || props.tenantId.trim() === '') {
-            throw new Error('Tenant ID is required');
-        }
-
         if (!props.name || props.name.trim() === '') {
             throw new Error('Plan name is required');
         }
@@ -90,7 +83,6 @@ export class Plan {
 
     // Getters
     get id(): string { return this._id; }
-    get tenantId(): string { return this._tenantId; }
     get planFamilyId(): string | undefined { return this._planFamilyId; }
     get name(): string { return this._name; }
     get planCode(): string { return this._planCode; }
@@ -133,7 +125,6 @@ export class Plan {
     toProps(): PlanProps {
         return {
             id: this._id,
-            tenantId: this._tenantId,
             planFamilyId: this._planFamilyId,
             name: this._name,
             planCode: this._planCode,

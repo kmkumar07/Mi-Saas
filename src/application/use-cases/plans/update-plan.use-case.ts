@@ -75,9 +75,6 @@ export class UpdatePlanUseCase {
                 if (!product) {
                     throw new NotFoundException(`Product with ID ${productId} not found`);
                 }
-                if (product.tenantId !== existingPlan.tenantId) {
-                    throw new Error(`Product ${productId} does not belong to tenant ${existingPlan.tenantId}`);
-                }
                 return product;
             })
         );

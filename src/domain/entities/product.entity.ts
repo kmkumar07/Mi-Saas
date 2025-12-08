@@ -2,7 +2,6 @@ import { randomUUID } from 'crypto';
 
 export interface ProductProps {
     id?: string;
-    tenantId: string;
     name: string;
     description?: string;
     apiKey?: string;
@@ -13,7 +12,6 @@ export interface ProductProps {
 
 export class Product {
     private readonly _id: string;
-    private readonly _tenantId: string;
     private _name: string;
     private _description?: string;
     private _apiKey?: string;
@@ -24,7 +22,6 @@ export class Product {
     constructor(props: ProductProps) {
         this.validate(props);
         this._id = props.id || randomUUID(); // Generate UUID if not provided
-        this._tenantId = props.tenantId;
         this._name = props.name;
         this._description = props.description;
         this._apiKey = props.apiKey;
@@ -34,10 +31,6 @@ export class Product {
     }
 
     private validate(props: ProductProps): void {
-        if (!props.tenantId || props.tenantId.trim() === '') {
-            throw new Error('Tenant ID is required');
-        }
-
         if (!props.name || props.name.trim() === '') {
             throw new Error('Product name is required');
         }
@@ -50,10 +43,6 @@ export class Product {
     // Getters
     get id(): string {
         return this._id;
-    }
-
-    get tenantId(): string {
-        return this._tenantId;
     }
 
     get name(): string {

@@ -37,8 +37,8 @@ export class CreateSubscriptionUseCase {
             throw new NotFoundException(`Plan ${dto.planId} not found`);
         }
 
-        if (account.tenantId !== dto.tenantId || plan.tenantId !== dto.tenantId) {
-            throw new BadRequestException('Tenant mismatch between account, plan, and request');
+        if (account.tenantId !== dto.tenantId) {
+            throw new BadRequestException('Tenant mismatch between account and request');
         }
 
         // Seats are driven by plan/feature configuration; we keep a default internal value.

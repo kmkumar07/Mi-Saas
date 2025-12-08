@@ -24,7 +24,6 @@ export class PlanRepository implements IPlanRepository {
         const planResult = await this.db
             .insert(schema.plans)
             .values({
-                tenantId: plan.tenantId,
                 planFamilyId: plan.planFamilyId,
                 name: plan.name,
                 planCode: plan.planCode,
@@ -112,15 +111,6 @@ export class PlanRepository implements IPlanRepository {
         }
 
         return this.toDomain(planResult[0]);
-    }
-
-    async findByTenantId(tenantId: string): Promise<Plan[]> {
-        const results = await this.db
-            .select()
-            .from(schema.plans)
-            .where(eq(schema.plans.tenantId, tenantId));
-
-        return Promise.all(results.map((row) => this.toDomain(row)));
     }
 
     async findByProductId(productId: string): Promise<Plan[]> {
@@ -367,7 +357,6 @@ export class PlanRepository implements IPlanRepository {
 
         return new Plan({
             id: row.id,
-            tenantId: row.tenantId,
             planFamilyId: row.planFamilyId || undefined,
             name: row.name,
             planCode: row.planCode,

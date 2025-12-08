@@ -24,14 +24,11 @@ export class UpdatePlanFamilyUseCase {
         }
 
         if (dto.planCode !== undefined) {
-            // Check if new plan code already exists for this tenant
-            const existingFamily = await this.planFamilyRepository.findByPlanCode(
-                planFamily.tenantId,
-                dto.planCode,
-            );
+            // Check if new plan code already exists
+            const existingFamily = await this.planFamilyRepository.findByPlanCode(dto.planCode);
             if (existingFamily && existingFamily.id !== id) {
                 throw new BadRequestException(
-                    `Plan family with planCode '${dto.planCode}' already exists for tenant ${planFamily.tenantId}`,
+                    `Plan family with planCode '${dto.planCode}' already exists`,
                 );
             }
             planFamily.updatePlanCode(dto.planCode);
@@ -51,7 +48,6 @@ export class UpdatePlanFamilyUseCase {
     private toResponseDto(planFamily: PlanFamily): PlanFamilyResponseDto {
         return {
             id: planFamily.id,
-            tenantId: planFamily.tenantId,
             name: planFamily.name,
             planCode: planFamily.planCode,
             metadata: planFamily.metadata,

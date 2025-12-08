@@ -11,7 +11,6 @@ export class PlanFamilyMapper {
      */
     toPersistence(family: PlanFamily): {
         id: string;
-        tenantId: string;
         name: string;
         planCode: string;
         metadata?: Record<string, any>;
@@ -20,7 +19,6 @@ export class PlanFamilyMapper {
     } {
         return {
             id: family.id,
-            tenantId: family.tenantId,
             name: family.name,
             planCode: family.planCode,
             metadata: family.metadata,
@@ -34,7 +32,6 @@ export class PlanFamilyMapper {
      */
     toDomain(row: {
         id: string;
-        tenantId: string;
         name: string;
         planCode: string;
         metadata?: unknown;
@@ -43,7 +40,6 @@ export class PlanFamilyMapper {
     }): PlanFamily {
         return PlanFamily.create({
             id: row.id,
-            tenantId: row.tenantId,
             name: row.name,
             planCode: row.planCode,
             metadata: row.metadata ? (row.metadata as Record<string, any>) : undefined,

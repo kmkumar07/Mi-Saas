@@ -6,14 +6,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  */
 export class CreatePlanFamilyDto {
     @ApiProperty({
-        description: 'Tenant ID',
-        example: 'tenant-uuid',
-    })
-    @IsNotEmpty()
-    @IsString()
-    tenantId: string;
-
-    @ApiProperty({
         description: 'Plan family name',
         example: 'Premium Plan Family',
     })

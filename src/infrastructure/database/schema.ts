@@ -144,9 +144,6 @@ export const accounts: ReturnType<typeof pgTable> = pgTable('accounts', {
 
 export const products = pgTable('products', {
     id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id')
-        .references(() => tenants.id, { onDelete: 'cascade' })
-        .notNull(),
     name: text('name').notNull(),
     description: text('description'),
     apiKey: text('api_key'),
@@ -178,23 +175,17 @@ export const planStatusEnum = pgEnum('plan_status', [
 
 export const planFamilies = pgTable('plan_families', {
     id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id')
-        .references(() => tenants.id, { onDelete: 'cascade' })
-        .notNull(),
     name: text('name').notNull(),
     planCode: text('plan_code').notNull(),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
-    tenantPlanCodeUnique: unique().on(table.tenantId, table.planCode),
+    planCodeUnique: unique().on(table.planCode),
 }));
 
 export const plans = pgTable('plans', {
     id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id')
-        .references(() => tenants.id, { onDelete: 'cascade' })
-        .notNull(),
     planFamilyId: uuid('plan_family_id')
         .references(() => planFamilies.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),

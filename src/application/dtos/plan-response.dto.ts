@@ -125,9 +125,6 @@ export class PlanResponseDto {
   @ApiProperty({ example: 'uuid' })
   id: string;
 
-  @ApiProperty({ example: 'tenant-uuid' })
-  tenantId: string;
-
   @ApiProperty({ example: 'Premium Plan' })
   name: string;
 

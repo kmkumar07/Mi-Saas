@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { PlanFamily } from '@domain/entities';
 import { IPlanFamilyRepository } from '@domain/repositories';
 import * as schema from '../schema';
@@ -39,16 +39,11 @@ export class PlanFamilyRepository implements IPlanFamilyRepository {
         return this.mapper.toDomain(result[0]);
     }
 
-    async findByPlanCode(tenantId: string, planCode: string): Promise<PlanFamily | null> {
+    async findByPlanCode(planCode: string): Promise<PlanFamily | null> {
         const result = await this.db
             .select()
             .from(schema.planFamilies)
-            .where(
-                and(
-                    eq(schema.planFamilies.tenantId, tenantId),
-                    eq(schema.planFamilies.planCode, planCode),
-                ),
-            )
+            .where(eq(schema.planFamilies.planCode, planCode))
             .limit(1);
 
         if (result.length === 0) {
@@ -58,11 +53,10 @@ export class PlanFamilyRepository implements IPlanFamilyRepository {
         return this.mapper.toDomain(result[0]);
     }
 
-    async findByTenantId(tenantId: string): Promise<PlanFamily[]> {
+    async findAll(): Promise<PlanFamily[]> {
         const result = await this.db
             .select()
-            .from(schema.planFamilies)
-            .where(eq(schema.planFamilies.tenantId, tenantId));
+            .from(schema.planFamilies);
 
         return result.map(row => this.mapper.toDomain(row));
     }

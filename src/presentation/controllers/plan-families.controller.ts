@@ -25,7 +25,6 @@ export class PlanFamiliesController {
     @ApiOperation({ summary: 'Create a new plan family' })
     @ApiResponse({ status: 201, description: 'Plan family created successfully', type: PlanFamilyResponseDto })
     @ApiResponse({ status: 400, description: 'Invalid input or plan code already exists' })
-    @ApiResponse({ status: 404, description: 'Tenant not found' })
     async create(@Body() createPlanFamilyDto: CreatePlanFamilyDto): Promise<PlanFamilyResponseDto> {
         return await this.createPlanFamilyUseCase.execute(createPlanFamilyDto);
     }
@@ -39,12 +38,11 @@ export class PlanFamiliesController {
         return await this.getPlanFamilyUseCase.execute(id);
     }
 
-    @Get('tenant/:tenantId')
-    @ApiOperation({ summary: 'List plan families by tenant ID' })
-    @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
+    @Get()
+    @ApiOperation({ summary: 'List plan families' })
     @ApiResponse({ status: 200, description: 'List of plan families', type: [PlanFamilyResponseDto] })
-    async listByTenant(@Param('tenantId') tenantId: string): Promise<PlanFamilyResponseDto[]> {
-        return await this.listPlanFamiliesUseCase.execute(tenantId);
+    async list(): Promise<PlanFamilyResponseDto[]> {
+        return await this.listPlanFamiliesUseCase.execute();
     }
 
     @Put(':id')

@@ -23,7 +23,6 @@ export class GetPlanFamilyUseCase {
     private toResponseDto(planFamily: PlanFamily): PlanFamilyResponseDto {
         return {
             id: planFamily.id,
-            tenantId: planFamily.tenantId,
             name: planFamily.name,
             planCode: planFamily.planCode,
             metadata: planFamily.metadata,

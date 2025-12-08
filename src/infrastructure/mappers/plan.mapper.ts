@@ -14,7 +14,6 @@ export class PlanMapper {
      */
     toPersistence(plan: Plan): {
         id: string;
-        tenantId: string;
         planFamilyId?: string;
         name: string;
         planCode: string;
@@ -30,7 +29,6 @@ export class PlanMapper {
     } {
         return {
             id: plan.id,
-            tenantId: plan.tenantId,
             planFamilyId: plan.planFamilyId,
             name: plan.name,
             planCode: plan.planCode,
@@ -56,7 +54,6 @@ export class PlanMapper {
     ): Plan {
         return new Plan({
             id: row.id,
-            tenantId: row.tenantId,
             planFamilyId: row.planFamilyId,
             name: row.name,
             planCode: row.planCode,

@@ -66,7 +66,6 @@ async function seed() {
         const [product1, product2, product3] = await db.insert(products).values([
             {
                 id: '550e8400-e29b-41d4-a716-446655440011',
-                tenantId: tenant1.id,
                 name: 'API Access',
                 description: 'Core API access with rate limiting',
                 apiKey: 'api_key_product_1',
@@ -75,7 +74,6 @@ async function seed() {
             },
             {
                 id: '550e8400-e29b-41d4-a716-446655440012',
-                tenantId: tenant1.id,
                 name: 'Analytics Dashboard',
                 description: 'Advanced analytics and reporting features',
                 apiKey: 'api_key_product_2',
@@ -84,7 +82,6 @@ async function seed() {
             },
             {
                 id: '550e8400-e29b-41d4-a716-446655440013',
-                tenantId: tenant1.id,
                 name: 'Premium Support',
                 description: '24/7 priority support with dedicated account manager',
                 apiKey: 'api_key_product_3',
@@ -187,7 +184,6 @@ async function seed() {
         const [freePlan, standardPlan, proPlan, enterprisePlan] = await db.insert(plans).values([
             {
                 id: '550e8400-e29b-41d4-a716-446655440031',
-                tenantId: tenant1.id,
                 name: 'Free Plan',
                 planCode: 'FREE',
                 planType: 'free',
@@ -197,7 +193,6 @@ async function seed() {
             },
             {
                 id: '550e8400-e29b-41d4-a716-446655440032',
-                tenantId: tenant1.id,
                 name: 'Standard Plan',
                 planCode: 'STANDARD',
                 planType: 'standard',
@@ -207,7 +202,6 @@ async function seed() {
             },
             {
                 id: '550e8400-e29b-41d4-a716-446655440033',
-                tenantId: tenant1.id,
                 name: 'Pro Plan',
                 planCode: 'PRO',
                 planType: 'pro',
@@ -217,7 +211,6 @@ async function seed() {
             },
             {
                 id: '550e8400-e29b-41d4-a716-446655440034',
-                tenantId: tenant1.id,
                 name: 'Enterprise Plan',
                 planCode: 'ENTERPRISE',
                 planType: 'enterprise',

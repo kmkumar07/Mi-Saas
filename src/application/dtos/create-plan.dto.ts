@@ -21,14 +21,6 @@ import { PlanFeatureConfigDto } from './plan-feature-config.dto';
  */
 export class CreatePlanDto {
     @ApiProperty({
-        description: 'Tenant ID',
-        example: 'tenant-uuid',
-    })
-    @IsNotEmpty()
-    @IsString()
-    tenantId: string;
-
-    @ApiProperty({
         description: 'Plan family ID (required)',
         example: 'plan-family-uuid',
     })

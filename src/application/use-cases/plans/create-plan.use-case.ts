@@ -30,15 +30,10 @@ export class CreatePlanUseCase {
     ) { }
 
     async execute(dto: CreatePlanDto): Promise<PlanResponseDto> {
-        // Step 0: Validate plan family exists and belongs to tenant
+        // Step 0: Validate plan family exists
         const planFamily = await this.planFamilyRepository.findById(dto.planFamilyId);
         if (!planFamily) {
             throw new NotFoundException(`Plan family with ID ${dto.planFamilyId} not found`);
-        }
-        if (planFamily.tenantId !== dto.tenantId) {
-            throw new BadRequestException(
-                `Plan family ${dto.planFamilyId} does not belong to tenant ${dto.tenantId}`,
-            );
         }
 
         // Step 1: Fetch existing products
@@ -47,9 +42,6 @@ export class CreatePlanUseCase {
             const product = await this.productRepository.findById(productId);
             if (!product) {
                 throw new NotFoundException(`Product with ID ${productId} not found`);
-            }
-            if (product.tenantId !== dto.tenantId) {
-                throw new BadRequestException(`Product ${productId} does not belong to tenant ${dto.tenantId}`);
             }
             products.push(product);
         }
@@ -172,7 +164,6 @@ export class CreatePlanUseCase {
 
         // Create plan entity with planFamilyId
         return new Plan({
-            tenantId: dto.tenantId,
             planFamilyId: dto.planFamilyId,
             name: dto.name,
             planCode: planCode,
