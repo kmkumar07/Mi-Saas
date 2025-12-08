@@ -8,10 +8,11 @@ import { PlanRepository } from '../../infrastructure/database/repositories/plan.
 import { ProductRepository } from '../../infrastructure/database/repositories/product.repository';
 import { FeatureRepository } from '../../infrastructure/database/repositories/feature.repository';
 import { PlanFeatureConfigRepository } from '../../infrastructure/database/repositories/plan-feature-config.repository';
+import { PricingModelRepository } from '../../infrastructure/database/repositories/pricing-model.repository';
 import { USAGE_EVENT_REPOSITORY } from '../../domain/repositories/usage-event.repository';
 import { SUBSCRIPTION_REPOSITORY } from '../../domain/repositories/subscription.repository';
 import { PLAN_FEATURE_CONFIG_REPOSITORY } from '@domain/repositories/plan-feature-config.repository';
-import { PLAN_REPOSITORY, PRODUCT_REPOSITORY, FEATURE_REPOSITORY } from '@domain/repositories';
+import { PLAN_REPOSITORY, PRODUCT_REPOSITORY, FEATURE_REPOSITORY, PRICING_MODEL_REPOSITORY } from '@domain/repositories';
 
 @Module({
     controllers: [UsageController],
@@ -41,6 +42,10 @@ import { PLAN_REPOSITORY, PRODUCT_REPOSITORY, FEATURE_REPOSITORY } from '@domain
         {
             provide: PLAN_FEATURE_CONFIG_REPOSITORY,
             useClass: PlanFeatureConfigRepository,
+        },
+        {
+            provide: PRICING_MODEL_REPOSITORY,
+            useClass: PricingModelRepository,
         },
     ],
 })

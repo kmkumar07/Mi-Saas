@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { IAccountRepository, ACCOUNT_REPOSITORY } from '@domain/repositories/account.repository';
 import { IPlanRepository, PLAN_REPOSITORY } from '@domain/repositories/plan.repository.interface';
+import { IPlanFamilyRepository, PLAN_FAMILY_REPOSITORY } from '@domain/repositories';
 import { IPaymentOrderRepository, PAYMENT_ORDER_REPOSITORY } from '@domain/repositories/payment-order.repository.interface';
 import { ISubscriptionRepository, SUBSCRIPTION_REPOSITORY } from '@domain/repositories/subscription.repository';
 import { IPaymentGateway, PAYMENT_GATEWAY } from '@domain/services/payment-gateway.interface';
@@ -15,6 +16,8 @@ export class CreateUpgradePaymentOrderUseCase {
         private readonly subscriptionRepository: ISubscriptionRepository,
         @Inject(PLAN_REPOSITORY)
         private readonly planRepository: IPlanRepository,
+        @Inject(PLAN_FAMILY_REPOSITORY)
+        private readonly planFamilyRepository: IPlanFamilyRepository,
         @Inject(ACCOUNT_REPOSITORY)
         private readonly accountRepository: IAccountRepository,
         @Inject(PAYMENT_ORDER_REPOSITORY)
@@ -46,9 +49,27 @@ export class CreateUpgradePaymentOrderUseCase {
             throw new NotFoundException(`New plan ${dto.newPlanId} not found`);
         }
 
-        // 4. Validate upgrade is allowed
-        if (!existingSubscription.canUpgradeToPlan(newPlan)) {
-            throw new BadRequestException(`Cannot upgrade to plan ${newPlan.name}. The subscription may already be on this plan or the upgrade is not allowed.`);
+        // 3.5. Get plan families to compare ranks
+        let currentPlanFamilyRank: number | undefined;
+        let newPlanFamilyRank: number | undefined;
+        
+        if (currentPlan.planFamilyId) {
+            const currentPlanFamily = await this.planFamilyRepository.findById(currentPlan.planFamilyId);
+            if (currentPlanFamily) {
+                currentPlanFamilyRank = currentPlanFamily.rank;
+            }
+        }
+        
+        if (newPlan.planFamilyId) {
+            const newPlanFamily = await this.planFamilyRepository.findById(newPlan.planFamilyId);
+            if (newPlanFamily) {
+                newPlanFamilyRank = newPlanFamily.rank;
+            }
+        }
+
+        // 4. Validate upgrade is allowed (based on rank)
+        if (!existingSubscription.canUpgradeToPlan(newPlan, currentPlanFamilyRank, newPlanFamilyRank)) {
+            throw new BadRequestException(`Cannot upgrade to plan ${newPlan.name}. The new plan must have a higher rank than the current plan.`);
         }
 
         // 5. Validate plans have valid prices

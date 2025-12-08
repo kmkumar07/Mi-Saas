@@ -149,57 +149,61 @@
           </div>
         </div>
 
-        <!-- Available Plans for Upgrade Section -->
+        <!-- All Available Plans Section -->
         <div v-if="activeSubscriptions.length > 0" class="dashboard-section">
-          <h2>Upgrade Plans</h2>
+          <h2>All Available Plans</h2>
           <div v-if="loadingUpgradePlans" class="loading">
-            <p>Loading upgrade plans...</p>
+            <p>Loading plans...</p>
           </div>
           <div v-else-if="upgradePlans.length === 0" class="empty-state">
-            <p>No upgrade plans available</p>
+            <p>No plans available</p>
           </div>
           <div v-else class="upgrade-plans-grid">
             <div
-              v-for="upgradePlan in upgradePlans"
-              :key="upgradePlan.plan.id"
-              class="upgrade-plan-card"
+              v-for="planItem in upgradePlans"
+              :key="planItem.plan.id"
+              :class="['upgrade-plan-card', { 'plan-disabled': planItem.isDisabled, 'plan-current': planItem.isCurrent }]"
             >
               <div class="upgrade-plan-header">
-                <h3>{{ upgradePlan.plan.name }}</h3>
+                <h3>{{ planItem.plan.name }}</h3>
+                <div v-if="planItem.isCurrent" class="current-plan-badge">Current Plan</div>
                 <div class="upgrade-plan-price">
-                  <span class="currency">{{ getCurrencySymbol(upgradePlan.plan.price?.currency) }}</span>
-                  <span class="amount">{{ formatPrice(upgradePlan.plan.price?.value || 0) }}</span>
-                  <span class="period">/ {{ getBillingPeriod(upgradePlan.plan) }}</span>
+                  <span class="currency">{{ getCurrencySymbol(planItem.plan.price?.currency) }}</span>
+                  <span class="amount">{{ formatPrice(planItem.plan.price?.value || 0) }}</span>
+                  <span class="period">/ {{ getBillingPeriod(planItem.plan) }}</span>
                 </div>
               </div>
-              <div v-if="upgradePlan.proration" class="proration-info">
+              <div v-if="planItem.proration && !planItem.isCurrent && !planItem.isDisabled" class="proration-info">
                 <div class="proration-item">
                   <span class="label">Pro-rated Amount:</span>
                   <span class="value highlight">
-                    {{ getCurrencySymbol(upgradePlan.plan.price?.currency) }}{{ formatPrice(upgradePlan.proration.amountDue) }}
+                    {{ getCurrencySymbol(planItem.plan.price?.currency) }}{{ formatPrice(planItem.proration.amountDue) }}
                   </span>
                 </div>
                 <div class="proration-item">
                   <span class="label">Credit from current plan:</span>
                   <span class="value">
-                    {{ getCurrencySymbol(upgradePlan.plan.price?.currency) }}{{ formatPrice(upgradePlan.proration.proratedCredit) }}
+                    {{ getCurrencySymbol(planItem.plan.price?.currency) }}{{ formatPrice(planItem.proration.proratedCredit) }}
                   </span>
                 </div>
                 <div class="proration-item">
                   <span class="label">Days remaining:</span>
-                  <span class="value">{{ upgradePlan.proration.daysRemaining }} days</span>
+                  <span class="value">{{ planItem.proration.daysRemaining }} days</span>
                 </div>
+              </div>
+              <div v-if="planItem.isDisabled && !planItem.isCurrent" class="disabled-info">
+                <p class="disabled-message">This plan has a lower tier than your current subscription</p>
               </div>
               <div class="upgrade-plan-details">
                 <div class="detail-item">
                   <span class="label">Plan Code:</span>
-                  <span class="value">{{ upgradePlan.plan.planCode }}</span>
+                  <span class="value">{{ planItem.plan.planCode }}</span>
                 </div>
-                <div v-if="upgradePlan.plan.products && upgradePlan.plan.products.length > 0" class="products">
+                <div v-if="planItem.plan.products && planItem.plan.products.length > 0" class="products">
                   <span class="label">Products:</span>
                   <div class="products-list">
                     <span
-                      v-for="product in upgradePlan.plan.products"
+                      v-for="product in planItem.plan.products"
                       :key="product.id"
                       class="product-tag"
                     >
@@ -210,11 +214,13 @@
               </div>
               <div class="upgrade-plan-actions">
                 <button
-                  @click="handleUpgrade(upgradePlan.subscription.id, upgradePlan.plan.id)"
-                  :disabled="upgrading === upgradePlan.plan.id"
+                  @click="handleUpgrade(planItem.subscription.id, planItem.plan.id)"
+                  :disabled="planItem.isDisabled || planItem.isCurrent || upgrading === planItem.plan.id"
                   class="btn btn-upgrade"
                 >
-                  <span v-if="upgrading === upgradePlan.plan.id">Upgrading...</span>
+                  <span v-if="upgrading === planItem.plan.id">Upgrading...</span>
+                  <span v-else-if="planItem.isCurrent">Current Plan</span>
+                  <span v-else-if="planItem.isDisabled">Downgrade Not Available</span>
                   <span v-else>Upgrade Now</span>
                 </button>
               </div>
@@ -385,13 +391,26 @@ const loadUpgradePlans = async (dashboard) => {
   upgradePlans.value = [];
 
   try {
-    // Get all plan families
+    // Get all plan families and sort by rank (ascending)
     const planFamilies = await apiService.getPlanFamilies();
+    const sortedPlanFamilies = [...planFamilies].sort((a, b) => (a.rank || 0) - (b.rank || 0));
+    
+    // Create a map of plan family ID to rank for quick lookup
+    const familyRankMap = new Map();
+    sortedPlanFamilies.forEach(family => {
+      familyRankMap.set(family.id, family.rank || 0);
+    });
     
     // Get all plans from all families
-    const allPlansPromises = planFamilies.map(async (family) => {
+    const allPlansPromises = sortedPlanFamilies.map(async (family) => {
       try {
-        return await apiService.getPlansByFamily(family.id);
+        const plans = await apiService.getPlansByFamily(family.id);
+        // Add family rank to each plan for filtering
+        return plans.map(plan => ({
+          ...plan,
+          familyRank: family.rank || 0,
+          familyId: family.id,
+        }));
       } catch (err) {
         console.warn(`Could not fetch plans for plan family ${family.id}:`, err);
         return [];
@@ -406,58 +425,75 @@ const loadUpgradePlans = async (dashboard) => {
       sub => sub.status === 'active' || sub.status === 'trial'
     );
 
-    // For each active subscription, find upgradeable plans
-    const upgradePlansList = [];
-    for (const subscription of activeSubs) {
-      const currentPlan = dashboard.plans.find(p => p.id === subscription.planId);
-      if (!currentPlan) continue;
+    if (activeSubs.length === 0) {
+      loadingUpgradePlans.value = false;
+      return;
+    }
 
-      // Filter plans that are different from current plan
-      const availablePlans = allPlans.filter(
-        plan => plan.id !== subscription.planId && 
-        (plan.status === 'published' || plan.status === 'active')
-      );
+    // Get the first active subscription (we'll use this for comparison)
+    const primarySubscription = activeSubs[0];
+    const currentPlan = dashboard.plans.find(p => p.id === primarySubscription.planId);
+    if (!currentPlan) {
+      loadingUpgradePlans.value = false;
+      return;
+    }
 
-      // Calculate proration for each upgradeable plan
-      for (const plan of availablePlans) {
+    // Find current plan's family rank
+    const currentPlanFamilyId = currentPlan.planFamilyId || 
+      sortedPlanFamilies.find(f => f.planCode === currentPlan.planCode)?.id;
+    const currentPlanFamilyRank = currentPlanFamilyId ? (familyRankMap.get(currentPlanFamilyId) || 0) : 0;
+
+    // Filter plans that are published/active (show ALL plans, not just upgrades)
+    const availablePlans = allPlans.filter(
+      plan => (plan.status === 'published' || plan.status === 'active')
+    );
+
+    // Process all plans and determine their relationship to current subscription
+    const allPlansList = [];
+    for (const plan of availablePlans) {
+      const planFamilyRank = plan.familyRank || 0;
+      const isCurrent = plan.id === primarySubscription.planId;
+      const isHigherRank = planFamilyRank > currentPlanFamilyRank;
+      const isLowerRank = planFamilyRank < currentPlanFamilyRank;
+      const isDisabled = isLowerRank && !isCurrent;
+
+      let proration = null;
+      
+      // Only calculate proration for upgrade plans (higher rank)
+      if (isHigherRank && !isCurrent) {
         try {
           // Get proration from backend for accurate calculation
-          const proration = await apiService.calculateProration(subscription.id, plan.id);
-          upgradePlansList.push({
-            subscription,
-            plan,
-            proration,
-          });
+          proration = await apiService.calculateProration(primarySubscription.id, plan.id);
         } catch (err) {
           console.warn(`Could not calculate proration for plan ${plan.id}:`, err);
           // Fallback to frontend calculation if backend fails
           try {
-            const proration = calculateProration(subscription, currentPlan, plan);
-            upgradePlansList.push({
-              subscription,
-              plan,
-              proration: { ...proration, currency: plan.price?.currency || 'INR' },
-            });
+            const calculatedProration = calculateProration(primarySubscription, currentPlan, plan);
+            proration = { ...calculatedProration, currency: plan.price?.currency || 'INR' };
           } catch (fallbackErr) {
             console.warn(`Frontend proration calculation also failed:`, fallbackErr);
           }
         }
       }
+
+      allPlansList.push({
+        subscription: primarySubscription,
+        plan,
+        proration,
+        isCurrent,
+        isDisabled,
+        isHigherRank,
+      });
     }
 
-    // Remove duplicates (same plan for different subscriptions)
-    const uniquePlans = new Map();
-    for (const item of upgradePlansList) {
-      const key = item.plan.id;
-      if (!uniquePlans.has(key) || 
-          (uniquePlans.get(key).proration.amountDue > item.proration.amountDue)) {
-        uniquePlans.set(key, item);
-      }
-    }
-
-    upgradePlans.value = Array.from(uniquePlans.values());
+    // Sort plans by family rank (ascending) - lower rank first, higher rank last
+    upgradePlans.value = allPlansList.sort((a, b) => {
+      const rankA = a.plan.familyRank || 0;
+      const rankB = b.plan.familyRank || 0;
+      return rankA - rankB;
+    });
   } catch (err) {
-    console.error('Error loading upgrade plans:', err);
+    console.error('Error loading plans:', err);
   } finally {
     loadingUpgradePlans.value = false;
   }
@@ -1082,10 +1118,50 @@ const formatDate = (date) => {
   position: relative;
 }
 
-.upgrade-plan-card:hover {
+.upgrade-plan-card:hover:not(.plan-disabled):not(.plan-current) {
   border-color: #22c55e;
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
   transform: translateY(-2px);
+}
+
+.upgrade-plan-card.plan-disabled {
+  opacity: 0.7;
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.upgrade-plan-card.plan-current {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.current-plan-badge {
+  display: inline-block;
+  background: #3b82f6;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.disabled-info {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.disabled-message {
+  margin: 0;
+  color: #92400e;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
 }
 
 .upgrade-plan-header {

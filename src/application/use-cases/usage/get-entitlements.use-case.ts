@@ -112,21 +112,36 @@ export class GetEntitlementsUseCase {
                 const usageData = aggregatedUsage.find(u => u.featureCode.toLowerCase() === feature.code.toLowerCase());
                 const used = usageData?.totalQuantity || 0;
 
-                // For metered features, check if there's a quota limit or calculate from pricing tiers
+                // For metered features, check if there's a quota limit or calculate from pricing model
                 let limit: number | undefined;
                 
                 // If there's a quota limit, use it
                 if (primaryConfig.quotaLimit) {
                     limit = primaryConfig.quotaLimit;
-                } else if (primaryConfig.pricingTiers.length > 0) {
-                    // If there are pricing tiers, use the highest toQuantity as the limit
-                    const highestTier = primaryConfig.pricingTiers
-                        .filter(tier => tier.toQuantity !== null && tier.toQuantity !== undefined)
-                        .sort((a, b) => (b.toQuantity || 0) - (a.toQuantity || 0))[0];
+                } else if (primaryConfig.pricingModel) {
+                    const pricingModel = primaryConfig.pricingModel;
                     
-                    if (highestTier) {
-                        limit = highestTier.toQuantity || undefined;
+                    // For tiered/graduated pricing, use the highest tier's toQuantity as the limit
+                    if ('tiers' in pricingModel && pricingModel.tiers.length > 0) {
+                        const highestTier = pricingModel.tiers
+                            .filter(tier => tier.toQuantity !== null && tier.toQuantity !== undefined)
+                            .sort((a, b) => (b.toQuantity || 0) - (a.toQuantity || 0))[0];
+                        
+                        if (highestTier) {
+                            limit = highestTier.toQuantity || undefined;
+                        }
                     }
+                    // For volume pricing, use the highest volume's maxVolume as the limit
+                    else if ('volumes' in pricingModel && pricingModel.volumes.length > 0) {
+                        const highestVolume = pricingModel.volumes
+                            .filter(volume => volume.maxVolume !== null && volume.maxVolume !== undefined)
+                            .sort((a, b) => (b.maxVolume || 0) - (a.maxVolume || 0))[0];
+                        
+                        if (highestVolume) {
+                            limit = highestVolume.maxVolume || undefined;
+                        }
+                    }
+                    // Per-user and per-usage pricing don't have usage limits
                 }
 
                 // Only add to usage if there's a limit

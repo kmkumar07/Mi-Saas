@@ -8,7 +8,7 @@ export interface FeatureProps {
     code: string;
     description?: string;
     featureType: FeatureType;
-    chargeModel: ChargeModel;
+    chargeModel?: ChargeModel; // Optional - charge model determined by pricing model on plan-features
     serviceUrl?: string;
     metadata?: Record<string, any>;
     createdAt?: Date;
@@ -21,7 +21,7 @@ export class Feature {
     private readonly _code: string;
     private _description?: string;
     private _featureType: FeatureType;
-    private _chargeModel: ChargeModel;
+    private _chargeModel?: ChargeModel;
     private _serviceUrl?: string;
     private _metadata?: Record<string, any>;
     private readonly _createdAt: Date;
@@ -89,7 +89,7 @@ export class Feature {
         return this._featureType;
     }
 
-    get chargeModel(): ChargeModel {
+    get chargeModel(): ChargeModel | undefined {
         return this._chargeModel;
     }
 
@@ -117,7 +117,7 @@ export class Feature {
         this._description = description;
     }
 
-    updateChargeModel(chargeModel: ChargeModel): void {
+    updateChargeModel(chargeModel?: ChargeModel): void {
         this._chargeModel = chargeModel;
     }
 

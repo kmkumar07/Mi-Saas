@@ -8,6 +8,7 @@ import {
     FEATURE_REPOSITORY,
     USAGE_EVENT_REPOSITORY,
     PLAN_FEATURE_CONFIG_REPOSITORY,
+    PRICING_MODEL_REPOSITORY,
 } from '@domain/repositories';
 import { TenantRepository } from '@infrastructure/database/repositories/tenant.repository';
 import { SubscriptionRepository } from '@infrastructure/database/repositories/subscription.repository';
@@ -16,6 +17,7 @@ import { ProductRepository } from '@infrastructure/database/repositories/product
 import { FeatureRepository } from '@infrastructure/database/repositories/feature.repository';
 import { UsageEventRepository } from '@infrastructure/database/repositories/usage-event.repository';
 import { PlanFeatureConfigRepository } from '@infrastructure/database/repositories/plan-feature-config.repository';
+import { PricingModelRepository } from '@infrastructure/database/repositories/pricing-model.repository';
 import { CreateTenantUseCase } from '@application/use-cases/tenants/create-tenant.use-case';
 import { GetTenantUseCase } from '@application/use-cases/tenants/get-tenant.use-case';
 import { GetAllTenantsUseCase } from '@application/use-cases/tenants/get-all-tenants.use-case';
@@ -54,6 +56,10 @@ import { TenantsController } from '@presentation/controllers/tenants.controller'
         {
             provide: PLAN_FEATURE_CONFIG_REPOSITORY,
             useClass: PlanFeatureConfigRepository,
+        },
+        {
+            provide: PRICING_MODEL_REPOSITORY,
+            useClass: PricingModelRepository,
         },
         CreateTenantUseCase,
         GetTenantUseCase,

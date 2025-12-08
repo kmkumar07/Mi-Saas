@@ -42,14 +42,14 @@ export class CreateFeatureInlineDto {
     @IsEnum(FeatureType)
     featureType: FeatureType;
 
-    @ApiProperty({
-        description: 'Charge model for the feature',
+    @ApiPropertyOptional({
+        description: 'Charge model for the feature (optional - determined by pricing model on plan-features)',
         enum: ChargeModel,
-        example: ChargeModel.PER_API_CALL,
+        example: ChargeModel.PER_USAGE,
     })
-    @IsNotEmpty()
+    @IsOptional()
     @IsEnum(ChargeModel)
-    chargeModel: ChargeModel;
+    chargeModel?: ChargeModel;
 
     @ApiPropertyOptional({
         description: 'Service URL for the feature',

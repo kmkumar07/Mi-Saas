@@ -54,10 +54,10 @@ export class GetTenantDashboardUseCase {
             sub => sub.status === 'active' || sub.status === 'trial' || sub.status === 'incomplete'
         );
 
-        // 3. Get plans for all subscriptions
-        const planIds = [...new Set(allSubscriptions.map(sub => sub.planId))];
-        const planDetails = await Promise.all(
-            planIds.map(async (planId) => {
+        // 3. Get plans for all subscriptions (for display purposes)
+        const allPlanIds = [...new Set(allSubscriptions.map(sub => sub.planId))];
+        const allPlanDetails = await Promise.all(
+            allPlanIds.map(async (planId) => {
                 try {
                     return await this.getPlanUseCase.execute(planId);
                 } catch (err) {
@@ -66,68 +66,85 @@ export class GetTenantDashboardUseCase {
                 }
             })
         );
-        const plans = planDetails.filter(p => p !== null) as PlanResponseDto[];
+        const plans = allPlanDetails.filter(p => p !== null) as PlanResponseDto[];
 
-        // 4. Get feature usage - load features for all subscriptions (not just active)
+        // 4. Get feature usage - ONLY use active subscriptions (like entitlements endpoint)
         const featureUsage: FeatureUsageDto[] = [];
         
-        if (plans.length > 0) {
-            // Get all product IDs from plans
-            const productIds = new Set<string>();
-            for (const plan of plans) {
-                if (plan.products) {
-                    plan.products.forEach(product => productIds.add(product.id));
+        // Only calculate feature usage if there are active subscriptions
+        if (activeSubscriptions.length > 0) {
+            // Get plan IDs from ACTIVE subscriptions only
+            const activePlanIds = [...new Set(activeSubscriptions.map(sub => sub.planId))];
+            const activePlanDetails = await Promise.all(
+                activePlanIds.map(async (planId) => {
+                    try {
+                        return await this.getPlanUseCase.execute(planId);
+                    } catch (err) {
+                        console.error(`Failed to get plan ${planId}:`, err);
+                        return null;
+                    }
+                })
+            );
+            const activePlans = activePlanDetails.filter(p => p !== null) as PlanResponseDto[];
+
+            if (activePlans.length > 0) {
+                // Get all product IDs from active plans only
+                const productIds = new Set<string>();
+                for (const plan of activePlans) {
+                    if (plan.products) {
+                        plan.products.forEach(product => productIds.add(product.id));
+                    }
                 }
-            }
 
-            // Get all features for these products
-            const allFeatures: any[] = [];
-            for (const productId of productIds) {
-                const features = await this.featureRepository.findByProductId(productId);
-                allFeatures.push(...features);
-            }
+                // Get all features for these products
+                const allFeatures: any[] = [];
+                for (const productId of productIds) {
+                    const features = await this.featureRepository.findByProductId(productId);
+                    allFeatures.push(...features);
+                }
 
-            // Get current usage for the billing period (if there are active subscriptions)
-            const now = new Date();
-            let aggregatedUsage: any[] = [];
-            if (subscriptionsForFeatures.length > 0) {
-                const periodStart = subscriptionsForFeatures[0]?.currentPeriodStart || new Date();
-                aggregatedUsage = await this.usageEventRepository.getAggregatedUsage(
+                // Get current usage for the billing period
+                const now = new Date();
+                const periodStart = activeSubscriptions[0]?.currentPeriodStart || new Date();
+                const aggregatedUsage = await this.usageEventRepository.getAggregatedUsage(
                     tenantId,
                     undefined, // customerId is optional
                     periodStart,
                     now
                 );
-            }
 
-            // Get plan feature configs
-            const planFeatureConfigs = await this.planFeatureConfigRepository.findByPlanIds(planIds);
+                // Get plan feature configs from ACTIVE plans only
+                const planFeatureConfigs = await this.planFeatureConfigRepository.findByPlanIds(activePlanIds);
 
-            // Convert aggregated usage array to a map for easy lookup
-            const usageMap = new Map<string, number>();
-            for (const usage of aggregatedUsage) {
-                usageMap.set(usage.featureCode.toUpperCase(), usage.totalQuantity);
-            }
+                // Convert aggregated usage array to a map for easy lookup
+                const usageMap = new Map<string, number>();
+                for (const usage of aggregatedUsage) {
+                    usageMap.set(usage.featureCode.toUpperCase(), usage.totalQuantity);
+                }
 
-            // Build feature usage array
-            for (const feature of allFeatures) {
-                // Find the config for this feature from any of the plans
-                const config = planFeatureConfigs.find(cfg => cfg.featureId === feature.id);
+                // Build feature usage array
+                for (const feature of allFeatures) {
+                    // Find configs for this feature from active plans
+                    const configsForFeature = planFeatureConfigs.filter(cfg => cfg.featureId === feature.id);
+                    
+                    // Use the first available config (prioritize active ones)
+                    const config = configsForFeature.find(cfg => cfg.isAvailable()) || configsForFeature[0];
 
-                const used = usageMap.get(feature.code.toUpperCase()) || 0;
-                const limit = config?.quotaLimit;
-                const isUnlimited = limit === null || limit === undefined;
+                    const used = usageMap.get(feature.code.toUpperCase()) || 0;
+                    const limit = config?.quotaLimit;
+                    const isUnlimited = limit === null || limit === undefined;
 
-                featureUsage.push({
-                    featureId: feature.id!,
-                    featureName: feature.name,
-                    featureCode: feature.code,
-                    featureDescription: feature.description,
-                    used,
-                    limit: limit,
-                    isUnlimited,
-                    featureType: feature.featureType,
-                });
+                    featureUsage.push({
+                        featureId: feature.id!,
+                        featureName: feature.name,
+                        featureCode: feature.code,
+                        featureDescription: feature.description,
+                        used,
+                        limit: limit,
+                        isUnlimited,
+                        featureType: feature.featureType,
+                    });
+                }
             }
         }
 

@@ -25,6 +25,7 @@ export class GetPlanFamilyUseCase {
             id: planFamily.id,
             name: planFamily.name,
             planCode: planFamily.planCode,
+            rank: planFamily.rank,
             metadata: planFamily.metadata,
             createdAt: planFamily.createdAt,
             updatedAt: planFamily.updatedAt,

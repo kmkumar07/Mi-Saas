@@ -146,6 +146,12 @@ export const apiService = {
     });
     return response.data;
   },
+
+  // Usage & Entitlements
+  async getEntitlements(tenantId) {
+    const response = await api.get(`/usage/entitlements/${tenantId}`);
+    return response.data;
+  },
 };
 
 export default apiService;

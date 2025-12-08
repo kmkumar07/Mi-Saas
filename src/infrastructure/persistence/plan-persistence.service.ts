@@ -21,13 +21,16 @@ import {
     trialPeriods as trialPeriodsTable,
     planFeatures as planFeaturesTable,
     featurePricingTiers as featurePricingTiersTable,
+    pricingModels as pricingModelsTable,
 } from '../database/schema';
 import { IProductVersionRepository, PRODUCT_VERSION_REPOSITORY } from '@domain/repositories/product-version.repository.interface';
+import { IPricingModelRepository, PRICING_MODEL_REPOSITORY, PricingModelWithDetails } from '@domain/repositories/pricing-model.repository';
 import { ProductVersion } from '@domain/entities/product-version.entity';
 import { Price } from '@domain/value-objects/price.vo';
 import { RenewalDefinition } from '@domain/value-objects/renewal-definition.vo';
 import { TimePeriod } from '@domain/value-objects/time-period.vo';
-import { FeaturePricingTier } from '@domain/value-objects';
+import { PricingModel, PerUserPricing, PerUsagePricing, TieredPricing, TieredPricingTier, VolumePricing, VolumePricingVolume, GraduatedPricing, GraduatedPricingTier } from '@domain/value-objects';
+import { ChargeModel } from '@domain/enums';
 import { randomUUID } from 'crypto';
 
 export interface PlanAggregatePersistenceResult {
@@ -41,6 +44,29 @@ export interface PlanFeatureConfigInput {
     featureCode?: string; // Use featureCode for backward compatibility
     isActive?: boolean;
     quotaLimit?: number;
+    pricingModel?: {
+        type: ChargeModel;
+        currency: string;
+        details?: Record<string, any>;
+        // Per-user pricing fields
+        pricePerUser?: number;
+        minUsers?: number;
+        // Per-usage pricing fields
+        pricePerUnit?: number;
+        unitName?: string;
+        // Tiered/Graduated pricing fields
+        tiers?: {
+            from: number;
+            to?: number | null;
+            price_per_unit: number;
+        }[];
+        // Volume pricing fields
+        volumes?: {
+            max_volume?: number | null;
+            price_per_unit: number;
+        }[];
+    };
+    // Legacy support for pricingTiers (deprecated)
     pricingTiers?: {
         fromQuantity: number;
         toQuantity?: number;
@@ -58,6 +84,8 @@ export class PlanPersistenceService {
     constructor(
         @Inject(DATABASE_CONNECTION)
         private readonly db: PostgresJsDatabase<typeof schema>,
+        @Inject(PRICING_MODEL_REPOSITORY)
+        private readonly pricingModelRepository: IPricingModelRepository,
         private readonly productMapper: ProductMapper,
         private readonly featureMapper: FeatureMapper,
         private readonly planMapper: PlanMapper,
@@ -491,14 +519,8 @@ export class PlanPersistenceService {
                     continue;
                 }
 
-                const tiers = (cfg.pricingTiers ?? []).map(tier =>
-                    new FeaturePricingTier({
-                        fromQuantity: tier.fromQuantity,
-                        toQuantity: tier.toQuantity,
-                        pricePerUnit: tier.pricePerUnit,
-                        currency: tier.currency ?? plan.price.currency,
-                    }),
-                );
+                // Convert pricing model DTO to value objects
+                const pricingModel = cfg.pricingModel ? this.createPricingModelFromInput(cfg.pricingModel, plan.price.currency) : undefined;
 
                 const planFeatureConfig = new PlanFeatureConfig({
                     planId: plan.id,
@@ -506,7 +528,7 @@ export class PlanPersistenceService {
                     featureType: feature.featureType,
                     isActive: cfg.isActive ?? true,
                     quotaLimit: cfg.quotaLimit,
-                    pricingTiers: tiers,
+                    pricingModel: pricingModel,
                 });
 
                 configuredFeatureIds.add(feature.id!);
@@ -524,20 +546,22 @@ export class PlanPersistenceService {
                     })
                     .returning();
 
-                // Persist pricing tiers if any
-                const pricingTiers = planFeatureConfig.pricingTiers;
-                if (pricingTiers.length > 0) {
-                    let index = 0;
-                    for (const tier of pricingTiers) {
-                        await tx.insert(featurePricingTiersTable).values({
-                            planFeatureId: planFeatureRow.id,
-                            tierIndex: index++,
-                            fromQuantity: tier.fromQuantity,
-                            toQuantity: tier.toQuantity ?? null,
-                            pricePerUnit: tier.pricePerUnit,
-                            currency: tier.currency,
-                        });
-                    }
+                // Persist pricing model if any
+                if (pricingModel && planFeatureConfig.pricingModel && cfg.pricingModel) {
+                    const basePricingModel = new PricingModel({
+                        id: randomUUID(),
+                        planFeatureId: planFeatureRow.id,
+                        type: cfg.pricingModel.type,
+                        currency: cfg.pricingModel.currency || plan.price.currency,
+                        details: cfg.pricingModel.details,
+                    });
+
+                    const pricingModelWithDetails: PricingModelWithDetails = {
+                        type: cfg.pricingModel.type,
+                        model: planFeatureConfig.pricingModel as any,
+                    };
+
+                    await this.pricingModelRepository.save(basePricingModel, pricingModelWithDetails);
                 }
             }
         } else {
@@ -553,14 +577,7 @@ export class PlanPersistenceService {
                     const cfg = configByCode.get(feature.code);
 
                     // Create config for all features (backward compatibility)
-                    const tiers = (cfg?.pricingTiers ?? []).map(tier =>
-                        new FeaturePricingTier({
-                            fromQuantity: tier.fromQuantity,
-                            toQuantity: tier.toQuantity,
-                            pricePerUnit: tier.pricePerUnit,
-                            currency: tier.currency ?? plan.price.currency,
-                        }),
-                    );
+                    const pricingModel = cfg?.pricingModel ? this.createPricingModelFromInput(cfg.pricingModel, plan.price.currency) : undefined;
 
                     const planFeatureConfig = new PlanFeatureConfig({
                         planId: plan.id,
@@ -568,7 +585,7 @@ export class PlanPersistenceService {
                         featureType: feature.featureType,
                         isActive: cfg?.isActive ?? true,
                         quotaLimit: cfg?.quotaLimit,
-                        pricingTiers: tiers,
+                        pricingModel: pricingModel,
                     });
 
                     configuredFeatureIds.add(feature.id!);
@@ -586,23 +603,115 @@ export class PlanPersistenceService {
                         })
                         .returning();
 
-                    // Persist pricing tiers if any
-                    const pricingTiers = planFeatureConfig.pricingTiers;
-                    if (pricingTiers.length > 0) {
-                        let index = 0;
-                        for (const tier of pricingTiers) {
-                            await tx.insert(featurePricingTiersTable).values({
-                                planFeatureId: planFeatureRow.id,
-                                tierIndex: index++,
-                                fromQuantity: tier.fromQuantity,
-                                toQuantity: tier.toQuantity ?? null,
-                                pricePerUnit: tier.pricePerUnit,
-                                currency: tier.currency,
-                            });
-                        }
+                    // Persist pricing model if any
+                    if (pricingModel && planFeatureConfig.pricingModel && cfg?.pricingModel) {
+                        const basePricingModel = new PricingModel({
+                            id: randomUUID(),
+                            planFeatureId: planFeatureRow.id,
+                            type: cfg.pricingModel.type,
+                            currency: cfg.pricingModel.currency || plan.price.currency,
+                            details: cfg.pricingModel.details,
+                        });
+
+                        const pricingModelWithDetails: PricingModelWithDetails = {
+                            type: cfg.pricingModel.type,
+                            model: planFeatureConfig.pricingModel as any,
+                        };
+
+                        await this.pricingModelRepository.save(basePricingModel, pricingModelWithDetails);
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Helper method to create pricing model value objects from DTO input
+     */
+    private createPricingModelFromInput(
+        input: PlanFeatureConfigInput['pricingModel'],
+        defaultCurrency: string,
+    ): PerUserPricing | PerUsagePricing | TieredPricing | VolumePricing | GraduatedPricing | undefined {
+        if (!input) return undefined;
+
+        const currency = input.currency || defaultCurrency;
+        const pricingModelId = randomUUID(); // Temporary ID, will be set when saved
+
+        switch (input.type) {
+            case ChargeModel.PER_USER:
+                if (input.pricePerUser === undefined) {
+                    throw new Error('pricePerUser is required for per_user pricing model');
+                }
+                return new PerUserPricing({
+                    id: randomUUID(),
+                    pricingModelId,
+                    pricePerUser: input.pricePerUser,
+                    minUsers: input.minUsers ?? 1,
+                });
+
+            case ChargeModel.PER_USAGE:
+                if (input.pricePerUnit === undefined || !input.unitName) {
+                    throw new Error('pricePerUnit and unitName are required for per_usage pricing model');
+                }
+                return new PerUsagePricing({
+                    id: randomUUID(),
+                    pricingModelId,
+                    pricePerUnit: input.pricePerUnit,
+                    unitName: input.unitName,
+                });
+
+            case ChargeModel.TIERED:
+                if (!input.tiers || input.tiers.length === 0 || !input.unitName) {
+                    throw new Error('tiers and unitName are required for tiered pricing model');
+                }
+                const tieredTiers = input.tiers.map((tier, index) =>
+                    new TieredPricingTier({
+                        id: randomUUID(),
+                        pricingModelId,
+                        tierIndex: index,
+                        fromQuantity: tier.from,
+                        toQuantity: tier.to ?? null,
+                        pricePerUnit: tier.price_per_unit,
+                        unitName: input.unitName!,
+                    })
+                );
+                return new TieredPricing(pricingModelId, tieredTiers, input.unitName);
+
+            case ChargeModel.VOLUME:
+                if (!input.volumes || input.volumes.length === 0 || !input.unitName) {
+                    throw new Error('volumes and unitName are required for volume pricing model');
+                }
+                const volumeVolumes = input.volumes.map((volume, index) =>
+                    new VolumePricingVolume({
+                        id: randomUUID(),
+                        pricingModelId,
+                        volumeIndex: index,
+                        maxVolume: volume.max_volume ?? null,
+                        pricePerUnit: volume.price_per_unit,
+                        unitName: input.unitName!,
+                    })
+                );
+                return new VolumePricing(pricingModelId, volumeVolumes, input.unitName);
+
+            case ChargeModel.GRADUATED:
+                if (!input.tiers || input.tiers.length === 0 || !input.unitName) {
+                    throw new Error('tiers and unitName are required for graduated pricing model');
+                }
+                const graduatedTiers = input.tiers.map((tier, index) =>
+                    new GraduatedPricingTier({
+                        id: randomUUID(),
+                        pricingModelId,
+                        tierIndex: index,
+                        fromQuantity: tier.from,
+                        toQuantity: tier.to ?? null,
+                        pricePerUnit: tier.price_per_unit,
+                        unitName: input.unitName!,
+                    })
+                );
+                return new GraduatedPricing(pricingModelId, graduatedTiers, input.unitName);
+
+            default:
+                throw new Error(`Unsupported pricing model type: ${input.type}`);
         }
     }
 }

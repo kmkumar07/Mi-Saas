@@ -142,6 +142,7 @@ export class GetPlansByFamilyUseCase {
 
         return {
             id: plan.id!,
+            planFamilyId: plan.planFamilyId,
             name: plan.name,
             planCode: plan.planCode,
             planType: plan.planType,

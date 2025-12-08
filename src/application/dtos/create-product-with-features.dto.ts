@@ -40,7 +40,7 @@ export class CreateProductWithFeaturesDto {
                 code: 'api_calls',
                 description: 'Track API usage',
                 featureType: 'metered',
-                chargeModel: 'per_api_call',
+                chargeModel: 'per_usage',
             },
         ],
     })

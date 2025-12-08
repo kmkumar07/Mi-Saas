@@ -57,8 +57,8 @@ export class FeatureResponseDto {
   @ApiProperty({ enum: FeatureType, example: FeatureType.METERED })
   featureType: FeatureType;
 
-  @ApiProperty({ enum: ChargeModel, example: ChargeModel.PER_API_CALL })
-  chargeModel: ChargeModel;
+  @ApiPropertyOptional({ enum: ChargeModel, example: ChargeModel.PER_USAGE })
+  chargeModel?: ChargeModel;
 
   @ApiPropertyOptional({ example: 'https://api.example.com/track' })
   serviceUrl?: string;
@@ -167,6 +167,9 @@ export class RenewalDefinitionResponseDto {
 export class PlanResponseDto {
   @ApiProperty({ example: 'uuid' })
   id: string;
+
+  @ApiPropertyOptional({ example: 'uuid', description: 'Plan family ID (for grouping plan versions)' })
+  planFamilyId?: string;
 
   @ApiProperty({ example: 'Premium Plan' })
   name: string;

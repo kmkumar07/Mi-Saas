@@ -16,7 +16,7 @@ export class FeatureMapper {
         code: string;
         description?: string;
         featureType: string;
-        chargeModel: string;
+        chargeModel?: string | null;
         serviceUrl?: string;
         metadata?: Record<string, any>;
         createdAt?: Date;
@@ -28,7 +28,7 @@ export class FeatureMapper {
             code: feature.code,
             description: feature.description,
             featureType: feature.featureType,
-            chargeModel: feature.chargeModel,
+            chargeModel: feature.chargeModel ?? null,
             serviceUrl: feature.serviceUrl,
             metadata: feature.metadata,
             createdAt: feature.createdAt,

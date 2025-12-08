@@ -26,6 +26,7 @@ export class CreatePlanFamilyUseCase {
         const planFamily = PlanFamily.create({
             name: dto.name,
             planCode: dto.planCode,
+            rank: dto.rank ?? 0,
             metadata: dto.metadata,
         });
 
@@ -41,6 +42,7 @@ export class CreatePlanFamilyUseCase {
             id: planFamily.id,
             name: planFamily.name,
             planCode: planFamily.planCode,
+            rank: planFamily.rank,
             metadata: planFamily.metadata,
             createdAt: planFamily.createdAt,
             updatedAt: planFamily.updatedAt,

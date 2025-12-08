@@ -115,3 +115,5 @@ async function requireFeature(featureCode) {
  
 
 5. create thh clone mechnism to update the plans .
+6.based on recurring period we need to enable in recurrent  payment provider
+7.recoincaltion .

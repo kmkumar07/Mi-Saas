@@ -5,6 +5,7 @@ export interface PlanFamilyProps {
     id?: string;
     name: string;
     planCode: string;
+    rank?: number;
     metadata?: Record<string, any>;
     createdAt?: Date;
     updatedAt?: Date;
@@ -24,6 +25,7 @@ export class PlanFamily {
     private readonly _id: string;
     private _name: string;
     private _planCode: string;
+    private _rank: number;
     private _metadata?: Record<string, any>;
     private readonly _createdAt: Date;
     private _updatedAt: Date;
@@ -33,6 +35,7 @@ export class PlanFamily {
         this._id = props.id ?? randomUUID();
         this._name = props.name;
         this._planCode = props.planCode;
+        this._rank = props.rank ?? 0;
         this._metadata = props.metadata;
         this._createdAt = props.createdAt ?? new Date();
         this._updatedAt = props.updatedAt ?? new Date();
@@ -83,6 +86,7 @@ export class PlanFamily {
     get id(): string { return this._id; }
     get name(): string { return this._name; }
     get planCode(): string { return this._planCode; }
+    get rank(): number { return this._rank; }
     get metadata(): Record<string, any> | undefined { return this._metadata; }
     get createdAt(): Date { return this._createdAt; }
     get updatedAt(): Date { return this._updatedAt; }
@@ -119,6 +123,24 @@ export class PlanFamily {
     }
 
     /**
+     * Updates the rank
+     */
+    updateRank(newRank: number): void {
+        if (newRank < 0) {
+            throw new Error('Rank cannot be negative');
+        }
+        this._rank = newRank;
+        this._updatedAt = new Date();
+    }
+
+    /**
+     * Checks if this plan family has a higher rank than another
+     */
+    isHigherRankThan(other: PlanFamily): boolean {
+        return this._rank > other.rank;
+    }
+
+    /**
      * Converts entity to props for persistence
      */
     toProps(): PlanFamilyProps {
@@ -126,6 +148,7 @@ export class PlanFamily {
             id: this._id,
             name: this._name,
             planCode: this._planCode,
+            rank: this._rank,
             metadata: this._metadata,
             createdAt: this._createdAt,
             updatedAt: this._updatedAt,

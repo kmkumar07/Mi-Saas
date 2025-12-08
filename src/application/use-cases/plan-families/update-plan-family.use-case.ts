@@ -38,6 +38,10 @@ export class UpdatePlanFamilyUseCase {
             planFamily.updateMetadata(dto.metadata);
         }
 
+        if (dto.rank !== undefined) {
+            planFamily.updateRank(dto.rank);
+        }
+
         // Persist changes
         const updatedPlanFamily = await this.planFamilyRepository.update(planFamily);
 
@@ -50,6 +54,7 @@ export class UpdatePlanFamilyUseCase {
             id: planFamily.id,
             name: planFamily.name,
             planCode: planFamily.planCode,
+            rank: planFamily.rank,
             metadata: planFamily.metadata,
             createdAt: planFamily.createdAt,
             updatedAt: planFamily.updatedAt,

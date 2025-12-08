@@ -13,7 +13,10 @@ export class ListPlanFamiliesUseCase {
     async execute(): Promise<PlanFamilyResponseDto[]> {
         const planFamilies = await this.planFamilyRepository.findAll();
 
-        return planFamilies.map(pf => this.toResponseDto(pf));
+        // Sort by rank (ascending) - lower rank first, higher rank last
+        const sorted = planFamilies.sort((a, b) => a.rank - b.rank);
+
+        return sorted.map(pf => this.toResponseDto(pf));
     }
 
     private toResponseDto(planFamily: PlanFamily): PlanFamilyResponseDto {
@@ -21,6 +24,7 @@ export class ListPlanFamiliesUseCase {
             id: planFamily.id,
             name: planFamily.name,
             planCode: planFamily.planCode,
+            rank: planFamily.rank,
             metadata: planFamily.metadata,
             createdAt: planFamily.createdAt,
             updatedAt: planFamily.updatedAt,

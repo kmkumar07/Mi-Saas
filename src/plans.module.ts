@@ -8,7 +8,8 @@ import { ProductVersionRepository } from '@infrastructure/database/repositories/
 import { FeatureRepository } from '@infrastructure/database/repositories/feature.repository';
 import { SubscriptionRepository } from '@infrastructure/database/repositories/subscription.repository';
 import { PlanFeatureConfigRepository } from '@infrastructure/database/repositories/plan-feature-config.repository';
-import { PLAN_REPOSITORY, PLAN_FAMILY_REPOSITORY, PRODUCT_REPOSITORY, PRODUCT_VERSION_REPOSITORY, FEATURE_REPOSITORY, SUBSCRIPTION_REPOSITORY, PLAN_FEATURE_CONFIG_REPOSITORY } from '@domain/repositories';
+import { PricingModelRepository } from '@infrastructure/database/repositories/pricing-model.repository';
+import { PLAN_REPOSITORY, PLAN_FAMILY_REPOSITORY, PRODUCT_REPOSITORY, PRODUCT_VERSION_REPOSITORY, FEATURE_REPOSITORY, SUBSCRIPTION_REPOSITORY, PLAN_FEATURE_CONFIG_REPOSITORY, PRICING_MODEL_REPOSITORY } from '@domain/repositories';
 import { PlanResponseMapper } from '@application/mappers/plan-response.mapper';
 import { ProductMapper } from '@infrastructure/mappers/product.mapper';
 import { FeatureMapper } from '@infrastructure/mappers/feature.mapper';
@@ -35,6 +36,10 @@ import { PlanFamiliesController } from '@presentation/controllers/plan-families.
 @Module({
     imports: [DatabaseModule, TenantsModule],
     controllers: [PlansController, ProductsController, FeaturesController, PlanFamiliesController],
+    exports: [
+        PLAN_FAMILY_REPOSITORY,
+        PLAN_REPOSITORY,
+    ],
     providers: [
         // Repositories
         {
@@ -64,6 +69,10 @@ import { PlanFamiliesController } from '@presentation/controllers/plan-families.
         {
             provide: PLAN_FEATURE_CONFIG_REPOSITORY,
             useClass: PlanFeatureConfigRepository,
+        },
+        {
+            provide: PRICING_MODEL_REPOSITORY,
+            useClass: PricingModelRepository,
         },
         // Application Mappers
         PlanResponseMapper,

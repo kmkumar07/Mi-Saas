@@ -17,8 +17,10 @@ import { ACCOUNT_REPOSITORY } from '@domain/repositories/account.repository';
 import { PAYMENT_REPOSITORY } from '@domain/repositories/payment.repository';
 import { PAYMENT_ORDER_REPOSITORY } from '@domain/repositories/payment-order.repository.interface';
 import { PAYMENT_GATEWAY } from '@domain/services/payment-gateway.interface';
+import { PlansModule } from '../../plans.module';
 
 @Module({
+    imports: [PlansModule],
     controllers: [SubscriptionsController],
     providers: [
         CreateSubscriptionUseCase,

@@ -43,13 +43,14 @@ export class CreateFeatureDto {
     @IsEnum(FeatureType)
     featureType: FeatureType;
 
-    @ApiProperty({
-        description: 'Charge model for this feature',
+    @ApiPropertyOptional({
+        description: 'Charge model for this feature (optional - determined by pricing model on plan-features)',
         enum: ChargeModel,
-        example: ChargeModel.PER_API_CALL,
+        example: ChargeModel.PER_USAGE,
     })
+    @IsOptional()
     @IsEnum(ChargeModel)
-    chargeModel: ChargeModel;
+    chargeModel?: ChargeModel;
 
     @ApiPropertyOptional({
         description: 'Meter type for metered features',

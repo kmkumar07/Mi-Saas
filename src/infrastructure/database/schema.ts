@@ -6,10 +6,17 @@ import { pgTable, uuid, text, varchar, boolean, jsonb, timestamp, bigint, intege
 
 export const chargeModelEnum = pgEnum('charge_model', [
     'flat',
-    'per_seat',
-    'per_api_call',
+    'per_user',
+    'per_usage',
     'tiered',
-    'package',
+    'volume',
+    'graduated',
+]);
+
+export const pricingModelTypeEnum = pgEnum('pricing_model_type', [
+    'per_user',
+    'per_usage',
+    'tiered',
     'volume',
     'graduated',
 ]);
@@ -186,7 +193,7 @@ export const features = pgTable('features', {
     code: text('code').notNull(),
     description: text('description'),
     featureType: featureTypeEnum('feature_type').notNull(),
-    chargeModel: chargeModelEnum('charge_model').notNull(),
+    chargeModel: chargeModelEnum('charge_model'), // Optional - charge model determined by pricing model on plan-features
     serviceUrl: text('service_url'),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -203,6 +210,7 @@ export const planFamilies = pgTable('plan_families', {
     id: uuid('id').primaryKey().defaultRandom(),
     name: text('name').notNull(),
     planCode: text('plan_code').notNull(),
+    rank: integer('rank').notNull().default(0),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -271,7 +279,7 @@ export const planFeatures = pgTable('plan_features', {
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Tiered pricing for metered plan features
+// Tiered pricing for metered plan features (deprecated - kept for backward compatibility)
 export const featurePricingTiers = pgTable('feature_pricing_tiers', {
     id: uuid('id').primaryKey().defaultRandom(),
     planFeatureId: uuid('plan_feature_id')
@@ -283,6 +291,78 @@ export const featurePricingTiers = pgTable('feature_pricing_tiers', {
     pricePerUnit: bigint('price_per_unit', { mode: 'number' }).notNull(),
     currency: varchar('currency', { length: 3 }).notNull().default('USD'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Pricing models base table
+export const pricingModels = pgTable('pricing_models', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    planFeatureId: uuid('plan_feature_id')
+        .references(() => planFeatures.id, { onDelete: 'cascade' })
+        .notNull(),
+    type: pricingModelTypeEnum('type').notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('USD'),
+    details: jsonb('details'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Per-user pricing model
+export const perUserPricing = pgTable('per_user_pricing', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pricingModelId: uuid('pricing_model_id')
+        .references(() => pricingModels.id, { onDelete: 'cascade' })
+        .notNull()
+        .unique(),
+    pricePerUser: bigint('price_per_user', { mode: 'number' }).notNull(),
+    minUsers: integer('min_users').notNull().default(1),
+});
+
+// Per-usage pricing model
+export const perUsagePricing = pgTable('per_usage_pricing', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pricingModelId: uuid('pricing_model_id')
+        .references(() => pricingModels.id, { onDelete: 'cascade' })
+        .notNull()
+        .unique(),
+    pricePerUnit: bigint('price_per_unit', { mode: 'number' }).notNull(),
+    unitName: varchar('unit_name', { length: 100 }).notNull(),
+});
+
+// Tiered pricing tiers
+export const tieredPricingTiers = pgTable('tiered_pricing_tiers', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pricingModelId: uuid('pricing_model_id')
+        .references(() => pricingModels.id, { onDelete: 'cascade' })
+        .notNull(),
+    tierIndex: integer('tier_index').notNull(),
+    fromQuantity: integer('from_quantity').notNull(),
+    toQuantity: integer('to_quantity'),
+    pricePerUnit: bigint('price_per_unit', { mode: 'number' }).notNull(),
+    unitName: varchar('unit_name', { length: 100 }).notNull(),
+});
+
+// Volume pricing volumes
+export const volumePricingVolumes = pgTable('volume_pricing_volumes', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pricingModelId: uuid('pricing_model_id')
+        .references(() => pricingModels.id, { onDelete: 'cascade' })
+        .notNull(),
+    volumeIndex: integer('volume_index').notNull(),
+    maxVolume: integer('max_volume'),
+    pricePerUnit: bigint('price_per_unit', { mode: 'number' }).notNull(),
+    unitName: varchar('unit_name', { length: 100 }).notNull(),
+});
+
+// Graduated pricing tiers
+export const graduatedPricingTiers = pgTable('graduated_pricing_tiers', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pricingModelId: uuid('pricing_model_id')
+        .references(() => pricingModels.id, { onDelete: 'cascade' })
+        .notNull(),
+    tierIndex: integer('tier_index').notNull(),
+    fromQuantity: integer('from_quantity').notNull(),
+    toQuantity: integer('to_quantity'),
+    pricePerUnit: bigint('price_per_unit', { mode: 'number' }).notNull(),
+    unitName: varchar('unit_name', { length: 100 }).notNull(),
 });
 
 // Prices table (one price per plan)
@@ -523,6 +603,24 @@ export type NewPlanFeature = typeof planFeatures.$inferInsert;
 
 export type FeaturePricingTier = typeof featurePricingTiers.$inferSelect;
 export type NewFeaturePricingTier = typeof featurePricingTiers.$inferInsert;
+
+export type PricingModel = typeof pricingModels.$inferSelect;
+export type NewPricingModel = typeof pricingModels.$inferInsert;
+
+export type PerUserPricing = typeof perUserPricing.$inferSelect;
+export type NewPerUserPricing = typeof perUserPricing.$inferInsert;
+
+export type PerUsagePricing = typeof perUsagePricing.$inferSelect;
+export type NewPerUsagePricing = typeof perUsagePricing.$inferInsert;
+
+export type TieredPricingTier = typeof tieredPricingTiers.$inferSelect;
+export type NewTieredPricingTier = typeof tieredPricingTiers.$inferInsert;
+
+export type VolumePricingVolume = typeof volumePricingVolumes.$inferSelect;
+export type NewVolumePricingVolume = typeof volumePricingVolumes.$inferInsert;
+
+export type GraduatedPricingTier = typeof graduatedPricingTiers.$inferSelect;
+export type NewGraduatedPricingTier = typeof graduatedPricingTiers.$inferInsert;
 
 export type Price = typeof prices.$inferSelect;
 export type NewPrice = typeof prices.$inferInsert;

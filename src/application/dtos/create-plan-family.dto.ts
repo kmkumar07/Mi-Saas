@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsObject } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsObject, IsInt, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -20,6 +20,16 @@ export class CreatePlanFamilyDto {
     @IsNotEmpty()
     @IsString()
     planCode: string;
+
+    @ApiPropertyOptional({
+        description: 'Rank for ordering plan families (higher rank = higher tier). Used for upgrade/downgrade logic.',
+        example: 3,
+        default: 0,
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    rank?: number;
 
     @ApiPropertyOptional({
         description: 'Additional metadata',

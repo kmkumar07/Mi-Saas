@@ -89,7 +89,17 @@ export class CreatePlanUseCase {
                 featureCode: feature.code,
                 isActive: cfg.isActive,
                 quotaLimit: cfg.quotaLimit,
-                pricingTiers: cfg.pricingTiers,
+                pricingModel: cfg.pricingModel ? {
+                    type: cfg.pricingModel.type,
+                    currency: cfg.pricingModel.currency,
+                    details: cfg.pricingModel.details,
+                    pricePerUser: cfg.pricingModel.pricePerUser,
+                    minUsers: cfg.pricingModel.minUsers,
+                    pricePerUnit: cfg.pricingModel.pricePerUnit,
+                    unitName: cfg.pricingModel.unitName,
+                    tiers: cfg.pricingModel.tiers,
+                    volumes: cfg.pricingModel.volumes,
+                } : undefined,
             };
         });
 

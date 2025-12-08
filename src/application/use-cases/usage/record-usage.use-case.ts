@@ -88,18 +88,37 @@ export class RecordUsageUseCase {
                 if (newTotalUsed > limit) {
                     limitExceeded = true;
                 }
-            } else if (primaryConfig.pricingTiers.length > 0) {
-                // Check if there's a max tier with toQuantity
-                const highestTier = primaryConfig.pricingTiers
-                    .filter(tier => tier.toQuantity !== null && tier.toQuantity !== undefined)
-                    .sort((a, b) => (b.toQuantity || 0) - (a.toQuantity || 0))[0];
+            } else if (primaryConfig.pricingModel) {
+                // Check limits based on pricing model type
+                const pricingModel = primaryConfig.pricingModel;
                 
-                if (highestTier) {
-                    limit = highestTier.toQuantity || null;
-                    if (limit !== null && newTotalUsed > limit) {
-                        limitExceeded = true;
+                // For tiered/graduated pricing, check highest tier
+                if ('tiers' in pricingModel && pricingModel.tiers.length > 0) {
+                    const highestTier = pricingModel.tiers
+                        .filter(tier => tier.toQuantity !== null && tier.toQuantity !== undefined)
+                        .sort((a, b) => (b.toQuantity || 0) - (a.toQuantity || 0))[0];
+                    
+                    if (highestTier) {
+                        limit = highestTier.toQuantity || null;
+                        if (limit !== null && newTotalUsed > limit) {
+                            limitExceeded = true;
+                        }
                     }
                 }
+                // For volume pricing, check highest volume
+                else if ('volumes' in pricingModel && pricingModel.volumes.length > 0) {
+                    const highestVolume = pricingModel.volumes
+                        .filter(volume => volume.maxVolume !== null && volume.maxVolume !== undefined)
+                        .sort((a, b) => (b.maxVolume || 0) - (a.maxVolume || 0))[0];
+                    
+                    if (highestVolume) {
+                        limit = highestVolume.maxVolume || null;
+                        if (limit !== null && newTotalUsed > limit) {
+                            limitExceeded = true;
+                        }
+                    }
+                }
+                // Per-user and per-usage pricing don't have usage limits
             }
         }
 

@@ -147,7 +147,7 @@ export class Subscription {
     }
 
     // Business Rules
-    canUpgradeToPlan(newPlan: Plan): boolean {
+    canUpgradeToPlan(newPlan: Plan, currentPlanFamilyRank?: number, newPlanFamilyRank?: number): boolean {
         if (this._status !== 'active' && this._status !== 'trial') {
             return false;
         }
@@ -156,10 +156,16 @@ export class Subscription {
             return false; // Cannot upgrade to same plan
         }
 
+        // If rank information is provided, validate upgrade based on rank
+        if (currentPlanFamilyRank !== undefined && newPlanFamilyRank !== undefined) {
+            return newPlanFamilyRank > currentPlanFamilyRank;
+        }
+
+        // Fallback: allow upgrade if rank info not available (backward compatibility)
         return true;
     }
 
-    canDowngradeToPlan(newPlan: Plan, currentUsage?: Record<string, number>): boolean {
+    canDowngradeToPlan(newPlan: Plan, currentPlanFamilyRank?: number, newPlanFamilyRank?: number, currentUsage?: Record<string, number>): boolean {
         if (this._status !== 'active' && this._status !== 'trial') {
             return false;
         }
@@ -168,9 +174,14 @@ export class Subscription {
             return false; // Cannot downgrade to same plan
         }
 
+        // If rank information is provided, validate downgrade based on rank
+        if (currentPlanFamilyRank !== undefined && newPlanFamilyRank !== undefined) {
+            return newPlanFamilyRank < currentPlanFamilyRank;
+        }
+
         // TODO: Check if current usage exceeds new plan limits
         // This would require comparing currentUsage against newPlan features
-        // For now, we allow downgrades
+        // For now, we allow downgrades if rank info not available
 
         return true;
     }

@@ -85,12 +85,12 @@ const loadPlans = async () => {
   error.value = null;
   
   try {
-    // Fetch plan families
+    // Fetch plan families and sort by rank (ascending)
     const families = await apiService.getPlanFamilies();
-    planFamilies.value = families;
+    planFamilies.value = [...families].sort((a, b) => (a.rank || 0) - (b.rank || 0));
     
-    // Fetch actual plans for each family
-    const planPromises = families.map(async (family) => {
+    // Fetch actual plans for each family (in sorted order)
+    const planPromises = planFamilies.value.map(async (family) => {
       try {
         const familyPlans = await apiService.getPlansByFamily(family.id);
         return familyPlans;

@@ -22,6 +22,12 @@ export class PlanFamilyResponseDto {
     })
     planCode: string;
 
+    @ApiProperty({
+        description: 'Rank for ordering plan families (higher rank = higher tier). Used for upgrade/downgrade logic.',
+        example: 3,
+    })
+    rank: number;
+
     @ApiPropertyOptional({
         description: 'Metadata',
         example: { description: 'Premium tier plans' },

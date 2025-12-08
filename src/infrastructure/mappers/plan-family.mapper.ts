@@ -13,6 +13,7 @@ export class PlanFamilyMapper {
         id: string;
         name: string;
         planCode: string;
+        rank: number;
         metadata?: Record<string, any>;
         createdAt: Date;
         updatedAt: Date;
@@ -21,6 +22,7 @@ export class PlanFamilyMapper {
             id: family.id,
             name: family.name,
             planCode: family.planCode,
+            rank: family.rank,
             metadata: family.metadata,
             createdAt: family.createdAt,
             updatedAt: family.updatedAt,
@@ -34,6 +36,7 @@ export class PlanFamilyMapper {
         id: string;
         name: string;
         planCode: string;
+        rank?: number;
         metadata?: unknown;
         createdAt: Date;
         updatedAt: Date;
@@ -42,6 +45,7 @@ export class PlanFamilyMapper {
             id: row.id,
             name: row.name,
             planCode: row.planCode,
+            rank: row.rank,
             metadata: row.metadata ? (row.metadata as Record<string, any>) : undefined,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
