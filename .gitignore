@@ -1,0 +1,12 @@
+# Node and build artifacts
+node_modules/
+dist/
+coverage/
+*.log
+
+# Environment files (ignore in all folders), but keep .env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+
