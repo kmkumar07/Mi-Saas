@@ -7,10 +7,17 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for error handling
+// Response interceptor for error handling and auth redirection
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // If SaaS backend says 401, redirect to UAM login so user can re-authenticate
+    if (error.response && error.response.status === 401) {
+      const uamAppUrl = import.meta.env.VITE_UAM_APP_URL || 'http://localhost:4200';
+      const redirectUrl = encodeURIComponent(window.location.href);
+      window.location.href = `${uamAppUrl}/auth/login?redirect=${redirectUrl}`;
+    }
+
     // Extract error message from various possible locations
     let message = 'An error occurred';
     

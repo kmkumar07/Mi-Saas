@@ -15,6 +15,21 @@ export class AuthService {
 
   readonly isAuthenticated = signal<boolean>(false);
 
+  /**
+   * Initialize auth state on app startup by checking the current user.
+   * If the backend accepts the cookie/token, we treat the user as authenticated.
+   */
+  initializeAuthState() {
+    this.http.get(`${API_BASE_URL}/api/auth/me`).subscribe({
+      next: () => {
+        this.isAuthenticated.set(true);
+      },
+      error: () => {
+        this.isAuthenticated.set(false);
+      },
+    });
+  }
+
   login(email: string, password: string) {
     return this.http
       .post<LoginResponse>(`${API_BASE_URL}/api/auth/login`, {

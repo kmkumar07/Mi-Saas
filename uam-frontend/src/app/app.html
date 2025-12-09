@@ -1,3 +1,22 @@
+<div class="app-shell">
+  <header class="app-header">
+    <div class="app-header__brand">
+      <span class="app-header__title">UAM Console</span>
+    </div>
 
+    <div class="app-header__actions">
+      <button
+        *ngIf="isAuthenticated()"
+        type="button"
+        class="app-header__logout-button"
+        (click)="logout()"
+      >
+        Logout
+      </button>
+    </div>
+  </header>
 
-<router-outlet />
+  <main class="app-main">
+    <router-outlet />
+  </main>
+</div>
