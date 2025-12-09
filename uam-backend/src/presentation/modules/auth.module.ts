@@ -30,5 +30,6 @@ import { TENANT_PROVISIONING_CLIENT } from '../../infrastructure/http/interfaces
             useClass: TenantProvisioningClient,
         },
     ],
+    exports: [JwtModule],
 })
 export class AuthModule { }

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, MinLength, Matches, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString, MinLength, Matches, IsOptional, IsArray, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -6,14 +6,6 @@ import { ApiProperty } from '@nestjs/swagger';
  * Validates invitation acceptance data
  */
 export class AcceptInvitationDto {
-    @ApiProperty({
-        description: 'Invitation token',
-        example: 'abc123def456...',
-    })
-    @IsString()
-    @IsNotEmpty({ message: 'Invitation token is required' })
-    token: string;
-
     @ApiProperty({
         description: 'User password',
         example: 'SecureP@ssw0rd',
@@ -43,4 +35,24 @@ export class AcceptInvitationDto {
     @IsString()
     @IsOptional()
     lastName?: string;
+
+    @ApiProperty({
+        description: 'Product ID to scope assigned roles to (optional)',
+        example: '223e4567-e89b-12d3-a456-426614174000',
+        required: false,
+    })
+    @IsUUID('4', { message: 'Invalid product ID format' })
+    @IsOptional()
+    productId?: string;
+
+    @ApiProperty({
+        description: 'Role IDs to assign to the user (admin activation only)',
+        example: ['0f8fad5b-d9cb-469f-a165-70867728950e'],
+        required: false,
+        isArray: true,
+    })
+    @IsArray()
+    @IsUUID('4', { each: true })
+    @IsOptional()
+    roleIds?: string[];
 }

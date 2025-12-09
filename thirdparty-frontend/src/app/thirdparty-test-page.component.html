@@ -1,0 +1,60 @@
+<div class="page">
+  <div class="page__header">
+    <div>
+      <h2>Third-party feature test</h2>
+      <p class="page__subtitle">
+        Use the same login from UAM, then hit the public and protected endpoints of the
+        third-party backend.
+      </p>
+    </div>
+  </div>
+
+  <div class="page__grid">
+    <section class="card">
+      <h3>1. Public endpoint</h3>
+      <p class="card__subtitle">No token required. Useful to verify that the backend is up.</p>
+
+      <button class="btn btn-secondary" (click)="callPublic()" [disabled]="isPublicLoading()">
+        {{ isPublicLoading() ? 'Calling…' : 'Call /public/ping' }}
+      </button>
+
+      <div class="card__result" *ngIf="publicState().status !== null">
+        <div class="badge">
+          Status: {{ publicState().status }}
+        </div>
+        <pre class="result-text">{{ publicState().message }}</pre>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>2. Protected endpoint</h3>
+      <p class="card__subtitle">
+        Requires a valid access token from UAM. You can log in using the header form above; the
+        backend will call UAM to check if the current user has
+        <code>THIRDPARTY_FEATURE_X</code>.
+      </p>
+
+      <button class="btn btn-primary" (click)="callProtected()" [disabled]="isProtectedLoading()">
+        {{ isProtectedLoading() ? 'Calling…' : 'Call /api/feature-x' }}
+      </button>
+
+      <div class="card__hint">
+        Make sure you are logged in (either via this app or the UAM app) so the
+        <code>uam_access_token</code> is present in <code>localStorage</code>.
+      </div>
+
+      <div class="card__result" *ngIf="protectedState().status !== null">
+        <div
+          class="badge"
+          [class.badge--success]="protectedState().status === 200"
+          [class.badge--error]="protectedState().status === 403 || protectedState().status === 401"
+        >
+          Status: {{ protectedState().status }}
+        </div>
+        <pre class="result-text">{{ protectedState().message }}</pre>
+      </div>
+    </section>
+  </div>
+</div>
+
+

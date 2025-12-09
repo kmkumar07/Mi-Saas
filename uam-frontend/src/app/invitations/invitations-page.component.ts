@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InvitationsService, Invitation } from '../core/invitations.service';
+import { RolesService, Role } from '../core/roles.service';
 
 @Component({
   selector: 'app-invitations-page',
@@ -13,7 +14,7 @@ import { InvitationsService, Invitation } from '../core/invitations.service';
         <div>
           <h2>Invitations</h2>
           <p class="page__subtitle">
-            Invite employees to the platform and assign roles.
+            Invite employees to the platform. You can assign roles later once the user is registered.
           </p>
         </div>
       </header>
@@ -22,10 +23,6 @@ import { InvitationsService, Invitation } from '../core/invitations.service';
         <label>
           <span>Email</span>
           <input type="email" name="email" [(ngModel)]="email" required />
-        </label>
-        <label>
-          <span>Comma separated role IDs</span>
-          <input type="text" name="roles" [(ngModel)]="roleIdsRaw" />
         </label>
         <button class="btn btn-primary" type="submit" [disabled]="inviting()">
           {{ inviting() ? 'Sending…' : 'Send invitation' }}
@@ -43,7 +40,7 @@ import { InvitationsService, Invitation } from '../core/invitations.service';
               <th>Email</th>
               <th>Status</th>
               <th>Expires</th>
-              <th></th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -68,13 +65,85 @@ import { InvitationsService, Invitation } from '../core/invitations.service';
               </td>
               <td>{{ inv.expiresAt | date: 'short' }}</td>
               <td>
-                <button
-                  class="btn btn-secondary"
-                  type="button"
-                  (click)="revoke(inv)"
-                >
-                  Revoke
-                </button>
+                <ng-container *ngIf="inv.status === 'pending'; else nonPendingActions">
+                  <div *ngIf="activatingId === inv.id; else activateButtonRow" class="activate-row">
+                    <input
+                      type="password"
+                      class="input"
+                      placeholder="Set password"
+                      name="password-{{ inv.id }}"
+                      [(ngModel)]="activatePassword"
+                    />
+                    <div class="roles-select">
+                      <label *ngFor="let role of roles()">
+                        <input
+                          type="checkbox"
+                          [checked]="isRoleSelected(inv.id, role.id)"
+                          (change)="toggleRole(inv.id, role.id, $event.target.checked)"
+                        />
+                        {{ role.roleName }}
+                      </label>
+                    </div>
+                    <div class="product-select" *ngIf="products().length > 0">
+                      <label>
+                        <span>Product</span>
+                        <select
+                          name="product-{{ inv.id }}"
+                          [(ngModel)]="selectedProductId"
+                          class="input"
+                        >
+                          <option [ngValue]="null">All products</option>
+                          <option
+                            *ngFor="let p of products()"
+                            [ngValue]="p.productId"
+                          >
+                            {{ p.productName }}
+                          </option>
+                        </select>
+                      </label>
+                    </div>
+                    <button
+                      class="btn btn-primary"
+                      type="button"
+                      (click)="activate(inv)"
+                      [disabled]="!activatePassword"
+                    >
+                      Activate
+                    </button>
+                    <button
+                      class="btn btn-secondary"
+                      type="button"
+                      (click)="cancelActivate()"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <ng-template #activateButtonRow>
+                    <button
+                      class="btn btn-primary btn--sm"
+                      type="button"
+                      (click)="startActivate(inv)"
+                    >
+                      Activate
+                    </button>
+                    <button
+                      class="btn btn-secondary btn--sm"
+                      type="button"
+                      (click)="revoke(inv)"
+                    >
+                      Revoke
+                    </button>
+                  </ng-template>
+                </ng-container>
+                <ng-template #nonPendingActions>
+                  <button
+                    class="btn btn-secondary btn--sm"
+                    type="button"
+                    (click)="revoke(inv)"
+                  >
+                    Revoke
+                  </button>
+                </ng-template>
               </td>
             </tr>
           </tbody>
@@ -85,18 +154,33 @@ import { InvitationsService, Invitation } from '../core/invitations.service';
 })
 export class InvitationsPageComponent implements OnInit {
   private readonly invitationsService = inject(InvitationsService);
+  private readonly rolesService = inject(RolesService);
 
   readonly invitations = signal<Invitation[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
   email = '';
-  roleIdsRaw = '';
   readonly inviting = signal(false);
   readonly inviteError = signal<string | null>(null);
 
+  activatingId: string | null = null;
+  activatePassword = '';
+
+  // Available roles for the tenant
+  readonly roles = signal<Role[]>([]);
+  // Selected role IDs per invitation
+  private selectedRoleIdsByInvitation: Record<string, string[]> = {};
+
+  // Available products for the tenant (loaded via RolesService)
+  readonly products = signal<{ productId: string; productName: string }[]>([]);
+  // Selected product for the currently activating invitation
+  selectedProductId: string | null = null;
+
   ngOnInit(): void {
     this.load();
+    this.loadRoles();
+    this.loadProducts();
   }
 
   private load() {
@@ -117,22 +201,15 @@ export class InvitationsPageComponent implements OnInit {
 
   onInvite() {
     if (!this.email) return;
-    const roleIds = this.roleIdsRaw
-      .split(',')
-      .map((r) => r.trim())
-      .filter(Boolean);
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
 
     this.inviting.set(true);
     this.inviteError.set(null);
 
-    this.invitationsService.sendInvitation(this.email, roleIds, expiresAt.toISOString()).subscribe({
+    // We only send email; roles will be assigned later from the admin UI.
+    this.invitationsService.sendInvitation(this.email, [], '').subscribe({
       next: () => {
         this.inviting.set(false);
         this.email = '';
-        this.roleIdsRaw = '';
         this.load();
       },
       error: (err) => {
@@ -146,6 +223,75 @@ export class InvitationsPageComponent implements OnInit {
     this.invitationsService.revokeInvitation(inv.id).subscribe({
       next: () => this.load(),
     });
+  }
+
+  startActivate(inv: Invitation) {
+    this.activatingId = inv.id;
+    this.activatePassword = '';
+    this.inviteError.set(null);
+    this.selectedProductId = null;
+  }
+
+  cancelActivate() {
+    this.activatingId = null;
+    this.activatePassword = '';
+  }
+
+  private loadRoles() {
+    this.rolesService.listRoles().subscribe({
+      next: (roles) => this.roles.set(roles),
+    });
+  }
+
+  private loadProducts() {
+    this.rolesService.loadTenantProducts().subscribe({
+      next: (products) => this.products.set(products),
+    });
+  }
+
+  isRoleSelected(invitationId: string, roleId: string): boolean {
+    return this.selectedRoleIdsByInvitation[invitationId]?.includes(roleId) ?? false;
+  }
+
+  toggleRole(invitationId: string, roleId: string, checked: boolean) {
+    const current = this.selectedRoleIdsByInvitation[invitationId] ?? [];
+    if (checked) {
+      if (!current.includes(roleId)) {
+        this.selectedRoleIdsByInvitation[invitationId] = [...current, roleId];
+      }
+    } else {
+      this.selectedRoleIdsByInvitation[invitationId] = current.filter((id) => id !== roleId);
+    }
+  }
+
+  activate(inv: Invitation) {
+    if (!this.activatePassword) {
+      return;
+    }
+
+    this.inviting.set(true);
+    this.inviteError.set(null);
+
+    const roleIds = this.selectedRoleIdsByInvitation[inv.id] ?? [];
+
+    const productId = this.selectedProductId;
+
+    this.invitationsService
+      .activateInvitation(inv.id, this.activatePassword, roleIds, productId)
+      .subscribe({
+      next: () => {
+        this.inviting.set(false);
+        this.activatingId = null;
+        this.activatePassword = '';
+        this.selectedRoleIdsByInvitation[inv.id] = [];
+        this.selectedProductId = null;
+        this.load();
+      },
+      error: (err) => {
+        this.inviting.set(false);
+        this.inviteError.set(err?.error?.message ?? 'Failed to activate user.');
+      },
+      });
   }
 }
 

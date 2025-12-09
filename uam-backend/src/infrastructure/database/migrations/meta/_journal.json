@@ -8,6 +8,13 @@
       "when": 1765309513257,
       "tag": "0000_fresh_jack_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1765312465833,
+      "tag": "0001_mean_epoch",
+      "breakpoints": true
     }
   ]
 }

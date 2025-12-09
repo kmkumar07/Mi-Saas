@@ -52,7 +52,7 @@ import { RolesService, Role } from '../core/roles.service';
               <td>
                 <div class="user-cell">
                   <div class="user-cell__avatar">
-                    {{ role.roleName?.[0] || role.roleCode?.[0] | uppercase }}
+                    {{ role.roleName[0] || role.roleCode[0] | uppercase }}
                   </div>
                   <div class="user-cell__info">
                     <div class="user-cell__name">

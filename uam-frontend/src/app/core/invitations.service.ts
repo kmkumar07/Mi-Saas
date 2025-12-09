@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_BASE_URL, DEFAULT_TENANT_ID, SYSTEM_ADMIN_USER_ID } from './api.config';
+import { API_BASE_URL } from './api.config';
 
 export interface Invitation {
   id: string;
@@ -20,19 +20,27 @@ export class InvitationsService {
   }
 
   sendInvitation(email: string, roleIds: string[], expiresAt: string) {
-    // Backend expects tenantId and invitedBy but currently injects them;
-    // we still send tenantId for clarity.
     return this.http.post<Invitation>(`${API_BASE_URL}/api/invitations`, {
-      tenantId: DEFAULT_TENANT_ID,
-      invitedBy: SYSTEM_ADMIN_USER_ID,
       email,
       roleIds,
-      expiresAt,
     });
   }
 
   revokeInvitation(invitationId: string) {
     return this.http.delete<void>(`${API_BASE_URL}/api/invitations/${invitationId}`);
+  }
+
+  activateInvitation(
+    invitationId: string,
+    password: string,
+    roleIds: string[],
+    productId?: string | null,
+  ) {
+    return this.http.post(`${API_BASE_URL}/api/invitations/${invitationId}/activate`, {
+      password,
+      roleIds,
+      productId: productId ?? undefined,
+    });
   }
 }
 

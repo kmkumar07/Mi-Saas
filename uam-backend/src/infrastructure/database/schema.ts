@@ -32,7 +32,7 @@ export const invitationStatusEnum = uamSchema.enum('invitation_status', [
  * tenant_id = NULL for global system roles
  */
 export const systemRoles = uamSchema.table(
-    'service_user_invlovemnet_roles',
+    'roles',
     {
         id: uuid('id').primaryKey().defaultRandom(),
         tenantId: uuid('tenant_id'), // NULL for global roles

@@ -125,3 +125,8 @@ async function requireFeature(featureCode) {
 sepearate application
 11.vouchers
 12.wallets
+
+
+UAM
+1.pass the product id from third party app ,
+2.when creating roles and user pass the  prdcut id form the uam frontend . and apply it in user_roles table

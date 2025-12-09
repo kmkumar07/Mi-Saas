@@ -120,6 +120,16 @@ export class RolesService {
       }[]
     >(`${API_BASE_URL}/api/roles/${roleId}/permissions`);
   }
+
+  /**
+   * Load the list of products for the current tenant.
+   * This reuses the tenant-features endpoint and extracts just the products.
+   */
+  loadTenantProducts() {
+    return this.http
+      .get<TenantFeaturesResponse>(`${API_BASE_URL}/api/roles/tenant-features`)
+      .pipe(map((response) => response.products ?? []));
+  }
 }
 
 

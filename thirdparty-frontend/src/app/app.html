@@ -1,0 +1,55 @@
+<main class="app-shell">
+  <header class="app-shell__header">
+    <div class="app-shell__brand">
+      <span class="app-shell__title">Third-party Test App</span>
+      <span class="app-shell__subtitle">Calls UAM to validate permissions</span>
+    </div>
+
+    <div class="app-shell__auth">
+      <ng-container *ngIf="isAuthenticated; else loggedOut">
+        <span class="app-shell__auth-status">Signed in with UAM</span>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          (click)="onLogout()"
+          [disabled]="logoutLoading"
+        >
+          {{ logoutLoading ? 'Signing out…' : 'Logout' }}
+        </button>
+      </ng-container>
+
+      <ng-template #loggedOut>
+        <form class="auth-inline-form" (ngSubmit)="onLoginSubmit()" autocomplete="on">
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            [(ngModel)]="email"
+            required
+            autocomplete="email"
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            [(ngModel)]="password"
+            required
+            autocomplete="current-password"
+          />
+          <button class="btn btn-primary" type="submit" [disabled]="loginLoading">
+            {{ loginLoading ? 'Signing in…' : 'Login' }}
+          </button>
+        </form>
+        <div class="auth-inline-error" *ngIf="loginError">
+          {{ loginError }}
+        </div>
+      </ng-template>
+    </div>
+  </header>
+
+  <section class="app-shell__content">
+    <router-outlet></router-outlet>
+  </section>
+</main>
+
+

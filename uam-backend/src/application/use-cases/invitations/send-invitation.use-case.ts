@@ -30,8 +30,6 @@ export class SendInvitationUseCase {
             throw new ConflictException(`User with email ${dto.email} already exists`);
         }
 
-        // ...
-
         // 2. Check if pending invitation already exists
         const existingInvitation = await this.invitationRepository.findByTenantId(tenantId, InvitationStatus.PENDING);
         const duplicate = existingInvitation.find(i => i.email === dto.email);
@@ -39,14 +37,12 @@ export class SendInvitationUseCase {
             throw new ConflictException(`Pending invitation already sent to ${dto.email}`);
         }
 
-        // ...
-
-        // 4. Create invitation
+        // 3. Create invitation (roles are optional; they can be assigned after user registration)
         const invitation = EmployeeInvitation.create({
             tenantId,
             email: dto.email,
             invitedBy,
-            roleIds: dto.roleIds,
+            roleIds: dto.roleIds ?? [],
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days expiration
         });
 

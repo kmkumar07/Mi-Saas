@@ -9,7 +9,7 @@ import { AcceptInvitationDto } from '../../dtos/invitations/accept-invitation.dt
 import { UserResponseDto } from '../../dtos/users/user-response.dto';
 import { UserMapper } from '../../mappers/user.mapper';
 import { AccountType, AuthProvider } from '../../../domain/enums';
-// import * as bcrypt from 'bcrypt'; // Assuming bcrypt is available or use a hashing service
+import * as bcrypt from 'bcrypt';
 
 /**
  * Accept Invitation Use Case
@@ -52,8 +52,8 @@ export class AcceptInvitationUseCase {
         }
 
         // 4. Create user
-        // In a real app, hash the password
-        const passwordHash = dto.password; // await bcrypt.hash(dto.password, 10);
+        // Hash the password before storing
+        const passwordHash = await bcrypt.hash(dto.password, 10);
 
         const user = User.create({
             tenantId: invitation.tenantId,
