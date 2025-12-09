@@ -19,6 +19,8 @@ export class TenantRepository implements ITenantRepository {
             .values({
                 name: tenant.name,
                 emailDomain: tenant.emailDomain,
+                accountType: tenant.accountType,
+                workspaceName: tenant.workspaceName,
                 metadata: tenant.metadata,
             })
             .returning();
@@ -78,6 +80,8 @@ export class TenantRepository implements ITenantRepository {
             id: row.id,
             name: row.name,
             emailDomain: row.emailDomain ?? undefined,
+            accountType: row.accountType ?? undefined,
+            workspaceName: row.workspaceName ?? undefined,
             metadata: row.metadata as Record<string, any>,
             createdAt: row.createdAt,
         });

@@ -32,14 +32,13 @@ export class UserRepository implements IUserRepository {
         return this.toDomain(result[0]);
     }
 
-    async findByEmail(email: string, tenantId: string): Promise<User | null> {
+    async findByEmail(email: string): Promise<User | null> {
         const result = await this.db
             .select()
             .from(schema.users)
             .where(
                 and(
-                    eq(schema.users.email, email),
-                    eq(schema.users.tenantId, tenantId)
+                    eq(schema.users.email, email)
                 )
             )
             .limit(1);

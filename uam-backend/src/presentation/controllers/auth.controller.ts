@@ -1,11 +1,12 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Headers, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { LoginDto } from '../../application/dtos/auth/login.dto';
-import { RefreshTokenDto } from '../../application/dtos/auth/refresh-token.dto';
+import { LoginDto, RefreshTokenDto, RegisterTenantDto } from '../../application/dtos/auth';
 import { TokenResponseDto } from '../../application/dtos/auth/token-response.dto';
 import { LoginUseCase } from '../../application/use-cases/auth/login.use-case';
 import { RefreshTokenUseCase } from '../../application/use-cases/auth/refresh-token.use-case';
 import { LogoutUseCase } from '../../application/use-cases/auth/logout.use-case';
+import { RegisterTenantUseCase } from '../../application/use-cases/auth/register-tenant.use-case';
+import { RegisterTenantResponseDto } from '../../application/dtos/auth/register-tenant-response.dto';
 
 /**
  * Authentication Controller
@@ -18,6 +19,7 @@ export class AuthController {
         private readonly loginUseCase: LoginUseCase,
         private readonly refreshTokenUseCase: RefreshTokenUseCase,
         private readonly logoutUseCase: LogoutUseCase,
+        private readonly registerTenantUseCase: RegisterTenantUseCase,
     ) { }
 
     @Post('login')
@@ -27,12 +29,10 @@ export class AuthController {
     @ApiResponse({ status: 401, description: 'Invalid credentials' })
     async login(@Body() loginDto: LoginDto): Promise<TokenResponseDto> {
         // For now, we'll use a hardcoded tenantId. In production, this would come from the request context
-        const tenantId = '00000000-0000-0000-0000-000000000001';
 
         return this.loginUseCase.execute(
             loginDto.email,
-            loginDto.password,
-            tenantId
+            loginDto.password
         );
     }
 
@@ -59,5 +59,17 @@ export class AuthController {
 
         const token = authHeader.split(' ')[1];
         await this.logoutUseCase.execute(token);
+    }
+
+    @Post('register-tenant')
+    @HttpCode(HttpStatus.CREATED)
+    @ApiOperation({ summary: 'Register a new tenant and its admin user' })
+    @ApiResponse({
+        status: 201,
+        description: 'Tenant and admin user created successfully',
+        type: RegisterTenantResponseDto,
+    })
+    async registerTenant(@Body() dto: RegisterTenantDto): Promise<RegisterTenantResponseDto> {
+        return this.registerTenantUseCase.execute(dto);
     }
 }

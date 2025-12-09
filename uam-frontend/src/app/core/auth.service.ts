@@ -1,7 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs/operators';
-import { API_BASE_URL, DEFAULT_TENANT_ID } from './api.config';
+import { API_BASE_URL } from './api.config';
 import { storeAccessToken } from './auth.interceptor';
 
 export interface LoginResponse {
@@ -29,22 +29,16 @@ export class AuthService {
       );
   }
 
-  registerUser(payload: {
+  registerTenant(payload: {
     email: string;
     password: string;
     firstName?: string;
     lastName?: string;
-    accountType?: 'individual' | 'company';
+    accountType: 'individual' | 'company';
+    companyName?: string;
+    workspaceName?: string;
   }) {
-    return this.http.post(`${API_BASE_URL}/api/users`, {
-      tenantId: DEFAULT_TENANT_ID,
-      email: payload.email,
-      password: payload.password,
-      firstName: payload.firstName,
-      lastName: payload.lastName,
-      authProvider: 'local',
-      accountType: payload.accountType ?? 'individual',
-    });
+    return this.http.post(`${API_BASE_URL}/api/auth/register-tenant`, payload);
   }
 
   logout() {

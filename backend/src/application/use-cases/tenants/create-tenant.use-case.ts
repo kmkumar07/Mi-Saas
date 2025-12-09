@@ -16,7 +16,13 @@ export class CreateTenantUseCase {
         const tenant = new Tenant({
             name: dto.name,
             emailDomain: dto.emailDomain,
-            metadata: dto.metadata,
+            accountType: dto.accountType,
+            workspaceName: dto.workspaceName,
+            metadata: {
+                ...(dto.metadata ?? {}),
+                accountType: dto.accountType,
+                workspaceName: dto.workspaceName,
+            },
         });
 
         // Persist
@@ -31,6 +37,8 @@ export class CreateTenantUseCase {
             id: tenant.id!,
             name: tenant.name,
             emailDomain: tenant.emailDomain,
+            accountType: tenant.accountType,
+            workspaceName: tenant.workspaceName,
             metadata: tenant.metadata,
             createdAt: tenant.createdAt,
         };

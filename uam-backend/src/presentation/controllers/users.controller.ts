@@ -1,5 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode, HttpStatus, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Request } from 'express';
+import { JwtService } from '@nestjs/jwt';
 import { CreateUserDto } from '../../application/dtos/users/create-user.dto';
 import { AssignRoleDto } from '../../application/dtos/users/assign-role.dto';
 import { BulkAssignRolesDto } from '../../application/dtos/users/bulk-assign-roles.dto';
@@ -28,14 +30,35 @@ export class UsersController {
         private readonly assignRoleToUserUseCase: AssignRoleToUserUseCase,
         private readonly removeRoleFromUserUseCase: RemoveRoleFromUserUseCase,
         private readonly bulkAssignRolesUseCase: BulkAssignRolesUseCase,
+        private readonly jwtService: JwtService,
     ) { }
+
+    private extractTenantId(req: Request): string {
+        const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+        if (!authHeader || Array.isArray(authHeader)) {
+            throw new UnauthorizedException('Missing Authorization header');
+        }
+
+        const parts = authHeader.split(' ');
+        if (parts.length !== 2 || parts[0] !== 'Bearer') {
+            throw new UnauthorizedException('Invalid Authorization header format');
+        }
+
+        const token = parts[1];
+        const payload: any = this.jwtService.decode(token);
+
+        if (!payload?.tenantId) {
+            throw new UnauthorizedException('Tenant ID not found in token');
+        }
+
+        return payload.tenantId;
+    }
 
     @Get()
     @ApiOperation({ summary: 'List all users for a tenant' })
     @ApiResponse({ status: 200, description: 'Users retrieved successfully', type: [UserResponseDto] })
-    async listUsers(): Promise<UserResponseDto[]> {
-        // Hardcoded tenantId for now
-        const tenantId = '00000000-0000-0000-0000-000000000001';
+    async listUsers(@Req() req: Request): Promise<UserResponseDto[]> {
+        const tenantId = this.extractTenantId(req);
         return this.listUsersUseCase.execute(tenantId);
     }
 
@@ -51,9 +74,10 @@ export class UsersController {
     @ApiOperation({ summary: 'Create a new user' })
     @ApiResponse({ status: 201, description: 'User created successfully', type: UserResponseDto })
     @ApiResponse({ status: 409, description: 'User already exists' })
-    async createUser(@Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
+    async createUser(@Req() req: Request, @Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
+        const tenantId = this.extractTenantId(req);
         return this.createUserUseCase.execute(
-            createUserDto.tenantId,
+            tenantId,
             createUserDto.email,
             createUserDto.password,
             createUserDto.firstName,

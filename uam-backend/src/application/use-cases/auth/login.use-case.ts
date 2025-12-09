@@ -16,9 +16,9 @@ export class LoginUseCase {
         private readonly jwtService: JwtService,
     ) { }
 
-    async execute(email: string, password: string, tenantId: string): Promise<TokenResponseDto> {
+    async execute(email: string, password: string): Promise<TokenResponseDto> {
         // Find user by email and tenant
-        const user = await this.userRepository.findByEmail(email, tenantId);
+        const user = await this.userRepository.findByEmail(email);
 
         if (!user) {
             throw new UnauthorizedException('Invalid credentials');

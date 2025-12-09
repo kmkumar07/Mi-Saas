@@ -16,16 +16,16 @@ export class CreateRoleUseCase {
         private readonly roleRepository: ISystemRoleRepository,
     ) { }
 
-    async execute(dto: CreateRoleDto): Promise<RoleResponseDto> {
+    async execute(tenantId: string, dto: CreateRoleDto): Promise<RoleResponseDto> {
         // 1. Check if role code already exists for this tenant
-        const existingRole = await this.roleRepository.findByCode(dto.roleCode, dto.tenantId);
+        const existingRole = await this.roleRepository.findByCode(dto.roleCode, tenantId);
         if (existingRole) {
             throw new ConflictException(`Role with code ${dto.roleCode} already exists`);
         }
 
         // 2. Create role entity
         const role = SystemRole.create({
-            tenantId: dto.tenantId,
+            tenantId,
             roleCode: dto.roleCode,
             roleName: dto.roleName,
             description: dto.description,

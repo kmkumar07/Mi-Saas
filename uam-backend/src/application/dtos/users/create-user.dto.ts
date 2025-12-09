@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, Matches, IsUUID, IsOptional, IsEnum } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, Matches, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -6,14 +6,6 @@ import { ApiProperty } from '@nestjs/swagger';
  * Validates user creation data
  */
 export class CreateUserDto {
-    @ApiProperty({
-        description: 'Tenant ID',
-        example: '123e4567-e89b-12d3-a456-426614174000',
-    })
-    @IsUUID('4', { message: 'Invalid tenant ID format' })
-    @IsNotEmpty({ message: 'Tenant ID is required' })
-    tenantId: string;
-
     @ApiProperty({
         description: 'User email address',
         example: 'user@example.com',

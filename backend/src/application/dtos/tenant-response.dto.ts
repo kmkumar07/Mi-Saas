@@ -23,6 +23,19 @@ export class TenantResponseDto {
     emailDomain?: string;
 
     @ApiPropertyOptional({
+        description: 'Tenant account type',
+        example: 'company',
+        enum: ['individual', 'company'],
+    })
+    accountType?: string;
+
+    @ApiPropertyOptional({
+        description: 'Workspace name (for individual tenants)',
+        example: 'John Personal Workspace',
+    })
+    workspaceName?: string;
+
+    @ApiPropertyOptional({
         description: 'Metadata',
         example: { industry: 'Technology', size: 'Enterprise' },
     })

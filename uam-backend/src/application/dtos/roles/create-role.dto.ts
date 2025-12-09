@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsInt, Min, Max, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsInt, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -6,14 +6,6 @@ import { ApiProperty } from '@nestjs/swagger';
  * Validates custom role creation data
  */
 export class CreateRoleDto {
-    @ApiProperty({
-        description: 'Tenant ID for tenant-specific role',
-        example: '123e4567-e89b-12d3-a456-426614174000',
-    })
-    @IsUUID('4', { message: 'Invalid tenant ID format' })
-    @IsNotEmpty({ message: 'Tenant ID is required' })
-    tenantId: string;
-
     @ApiProperty({
         description: 'Role code (unique identifier)',
         example: 'custom_manager',

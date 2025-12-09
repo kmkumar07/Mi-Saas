@@ -46,7 +46,7 @@ export class AcceptInvitationUseCase {
         }
 
         // 3. Check if user already exists (double check)
-        const existingUser = await this.userRepository.findByEmail(invitation.email, invitation.tenantId);
+        const existingUser = await this.userRepository.findByEmail(invitation.email);
         if (existingUser) {
             throw new ConflictException(`User with email ${invitation.email} already exists`);
         }

@@ -53,6 +53,16 @@ type AccountType = 'individual' | 'company';
           </label>
 
           <label class="auth-field auth-field--full">
+            <span>{{ accountType === 'company' ? 'Company name' : 'Workspace name' }}</span>
+            <input
+              type="text"
+              name="tenantName"
+              [(ngModel)]="tenantName"
+              required
+            />
+          </label>
+
+          <label class="auth-field auth-field--full">
             <span>Email</span>
             <input type="email" name="email" [(ngModel)]="email" required />
           </label>
@@ -102,6 +112,7 @@ export class RegisterPageComponent {
   lastName = '';
   email = '';
   password = '';
+  tenantName = '';
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -113,19 +124,21 @@ export class RegisterPageComponent {
     this.error.set(null);
 
     this.auth
-      .registerUser({
+      .registerTenant({
         email: this.email,
         password: this.password,
         firstName: this.firstName,
         lastName: this.lastName,
         accountType: this.accountType,
+        companyName: this.accountType === 'company' ? this.tenantName : undefined,
+        workspaceName: this.accountType === 'individual' ? this.tenantName : undefined,
       })
       .subscribe({
         next: () => {
           this.loading.set(false);
           this.router.navigate(['/auth/login']);
         },
-        error: (err) => {
+        error: (err: any) => {
           this.loading.set(false);
           this.error.set(err?.error?.message ?? 'Registration failed. Please try again.');
         },

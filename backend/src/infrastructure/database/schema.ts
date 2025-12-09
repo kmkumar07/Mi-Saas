@@ -115,6 +115,8 @@ export const tenants = pgTable('tenants', {
     id: uuid('id').primaryKey().defaultRandom(),
     name: text('name').notNull(),
     emailDomain: varchar('email_domain', { length: 255 }),
+    accountType: varchar('account_type', { length: 50 }),
+    workspaceName: text('workspace_name'),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });

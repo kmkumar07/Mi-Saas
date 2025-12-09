@@ -2,6 +2,8 @@ export interface TenantProps {
     id?: string;
     name: string;
     emailDomain?: string;
+    accountType?: 'individual' | 'company' | string;
+    workspaceName?: string;
     metadata?: Record<string, any>;
     createdAt?: Date;
 }
@@ -10,6 +12,8 @@ export class Tenant {
     private readonly _id?: string;
     private _name: string;
     private _emailDomain?: string;
+    private _accountType?: 'individual' | 'company' | string;
+    private _workspaceName?: string;
     private _metadata?: Record<string, any>;
     private readonly _createdAt: Date;
 
@@ -18,6 +22,8 @@ export class Tenant {
         this._id = props.id;
         this._name = props.name;
         this._emailDomain = props.emailDomain;
+        this._accountType = props.accountType;
+        this._workspaceName = props.workspaceName;
         this._metadata = props.metadata;
         this._createdAt = props.createdAt ?? new Date();
     }
@@ -45,6 +51,14 @@ export class Tenant {
         return this._emailDomain;
     }
 
+    get accountType(): string | undefined {
+        return this._accountType;
+    }
+
+    get workspaceName(): string | undefined {
+        return this._workspaceName;
+    }
+
     get metadata(): Record<string, any> | undefined {
         return this._metadata;
     }
@@ -63,6 +77,14 @@ export class Tenant {
 
     updateEmailDomain(domain: string): void {
         this._emailDomain = domain;
+    }
+
+    updateAccountType(accountType: string): void {
+        this._accountType = accountType;
+    }
+
+    updateWorkspaceName(name: string): void {
+        this._workspaceName = name;
     }
 
     updateMetadata(metadata: Record<string, any>): void {

@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_BASE_URL, DEFAULT_TENANT_ID } from './api.config';
+import { map } from 'rxjs/operators';
+import { API_BASE_URL } from './api.config';
 
 export interface Role {
   id: string;
@@ -19,6 +20,24 @@ export interface PermissionMatrixRow {
   canExecute: boolean;
 }
 
+// Shape of the SaaS features endpoint response
+export interface TenantFeaturesResponse {
+  tenantId: string;
+  products: {
+    productId: string;
+    productName: string;
+    features: {
+      featureId: string;
+      featureName: string;
+      featureCode: string;
+      featureDescription: string;
+      featureType: string;
+    }[];
+  }[];
+  totalFeatures: number;
+  activeSubscriptions: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class RolesService {
   private readonly http = inject(HttpClient);
@@ -33,10 +52,7 @@ export class RolesService {
     description?: string;
     hierarchyLevel: number;
   }) {
-    return this.http.post<Role>(`${API_BASE_URL}/api/roles`, {
-      tenantId: DEFAULT_TENANT_ID,
-      ...input,
-    });
+    return this.http.post<Role>(`${API_BASE_URL}/api/roles`, input);
   }
 
   bulkAssignPermissions(roleId: string, rows: PermissionMatrixRow[]) {
@@ -51,6 +67,34 @@ export class RolesService {
     return this.http.post(`${API_BASE_URL}/api/roles/${roleId}/permissions/bulk`, {
       permissions,
     });
+  }
+
+  /**
+   * Load the permission matrix rows for the current tenant.
+   * The backend derives tenantId from the JWT token.
+   */
+  loadPermissionMatrix() {
+    return this.http
+      .get<TenantFeaturesResponse>(`${API_BASE_URL}/api/roles/tenant-features`)
+      .pipe(
+        map((response) => {
+          const rows: PermissionMatrixRow[] = [];
+
+          for (const product of response.products ?? []) {
+            for (const feature of product.features ?? []) {
+              rows.push({
+                featureId: feature.featureId,
+                featureName: `${product.productName} – ${feature.featureName}`,
+                canRead: false,
+                canWrite: false,
+                canExecute: false,
+              });
+            }
+          }
+
+          return rows;
+        }),
+      );
   }
 }
 

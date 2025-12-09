@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsObject } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsObject, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -20,6 +20,24 @@ export class CreateTenantDto {
     @IsOptional()
     @IsString()
     emailDomain?: string;
+
+    @ApiPropertyOptional({
+        description: 'Tenant account type',
+        example: 'company',
+        enum: ['individual', 'company'],
+    })
+    @IsOptional()
+    @IsString()
+    @IsIn(['individual', 'company'])
+    accountType?: string;
+
+    @ApiPropertyOptional({
+        description: 'Workspace name (for individual tenants)',
+        example: 'John Personal Workspace',
+    })
+    @IsOptional()
+    @IsString()
+    workspaceName?: string;
 
     @ApiPropertyOptional({
         description: 'Additional metadata',

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { UsersController } from '../controllers/users.controller';
 import { CreateUserUseCase } from '../../application/use-cases/users/create-user.use-case';
 import { ListUsersUseCase } from '../../application/use-cases/users/list-users.use-case';
@@ -10,7 +11,12 @@ import { BulkAssignRolesUseCase } from '../../application/use-cases/users/bulk-a
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 
 @Module({
-    imports: [DatabaseModule],
+    imports: [
+        DatabaseModule,
+        JwtModule.register({
+            secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+        }),
+    ],
     controllers: [UsersController],
     providers: [
         CreateUserUseCase,

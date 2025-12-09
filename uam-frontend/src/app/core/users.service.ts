@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_BASE_URL, DEFAULT_TENANT_ID } from './api.config';
+import { API_BASE_URL } from './api.config';
 
 export interface User {
   id: string;
@@ -33,7 +33,6 @@ export class UsersService {
     accountType?: 'individual' | 'company';
   }) {
     return this.http.post<User>(`${API_BASE_URL}/api/users`, {
-      tenantId: DEFAULT_TENANT_ID,
       authProvider: 'local',
       ...payload,
     });

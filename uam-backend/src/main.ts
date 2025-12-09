@@ -15,17 +15,12 @@ async function bootstrap() {
         })
     );
 
-    // CORS configuration
-    const corsOriginsEnv = process.env.CORS_ORIGIN;
-    const defaultOrigins = ['http://localhost:5173', 'http://localhost:4200'];
-
-    const allowedOrigins = corsOriginsEnv
-        ? corsOriginsEnv.split(',').map((o) => o.trim()).filter(Boolean)
-        : defaultOrigins;
-
+    // CORS configuration (dev-friendly: allow any origin, reflect at runtime)
     app.enableCors({
-        origin: allowedOrigins,
+        origin: true, // Reflects the requesting origin in Access-Control-Allow-Origin
         credentials: true,
+        methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     });
 
     // Swagger API documentation

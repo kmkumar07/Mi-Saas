@@ -25,7 +25,7 @@ export class SendInvitationUseCase {
 
     async execute(tenantId: string, invitedBy: string, dto: SendInvitationDto): Promise<InvitationResponseDto> {
         // 1. Check if user already exists
-        const existingUser = await this.userRepository.findByEmail(dto.email, tenantId);
+        const existingUser = await this.userRepository.findByEmail(dto.email);
         if (existingUser) {
             throw new ConflictException(`User with email ${dto.email} already exists`);
         }
