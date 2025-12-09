@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@infrastructure/database/database.module';
-import { 
-    TENANT_REPOSITORY, 
-    SUBSCRIPTION_REPOSITORY, 
-    PLAN_REPOSITORY, 
+import {
+    TENANT_REPOSITORY,
+    SUBSCRIPTION_REPOSITORY,
+    PLAN_REPOSITORY,
     PRODUCT_REPOSITORY,
     FEATURE_REPOSITORY,
     USAGE_EVENT_REPOSITORY,
@@ -67,6 +67,6 @@ import { TenantsController } from '@presentation/controllers/tenants.controller'
         GetPlanUseCase,
         GetTenantDashboardUseCase,
     ],
-    exports: [TENANT_REPOSITORY],
+    exports: [TENANT_REPOSITORY, GetTenantDashboardUseCase],
 })
 export class TenantsModule { }

@@ -1,0 +1,25 @@
+export interface User {
+    id: string;
+    tenantId: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    isActive: boolean;
+    accountType: 'individual' | 'company';
+    createdAt: string;
+}
+
+export interface LoginRequest {
+    email: string;
+    password: string;
+}
+
+export interface LoginResponse {
+    accessToken: string;
+    refreshToken: string;
+    user: User;
+}
+
+export interface RefreshResponse {
+    accessToken: string;
+}

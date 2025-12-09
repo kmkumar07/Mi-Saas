@@ -1,0 +1,16 @@
+import { User } from '../entities/user.entity';
+
+/**
+ * User Repository Interface
+ * Defines contract for user persistence operations
+ * Follows Interface Segregation Principle and Dependency Inversion Principle
+ */
+export interface IUserRepository {
+    findById(id: string): Promise<User | null>;
+    findByEmail(email: string, tenantId: string): Promise<User | null>;
+    findByTenantId(tenantId: string): Promise<User[]>;
+    create(user: User): Promise<User>;
+    update(user: User): Promise<User>;
+    delete(id: string): Promise<void>;
+    existsByEmail(email: string, tenantId: string): Promise<boolean>;
+}
