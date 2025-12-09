@@ -14,7 +14,7 @@ export class ThirdPartyController {
   @Get('api/indoor_billing')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequiredFeature('indoor_billing')
-  @RequiredPermission('read')
+  @RequiredPermission('write')
   featureX(@Req() req: Request): string {
     const decision = (req as any).permissionDecision as
       | { roleName?: string; featureKey?: string; allowed?: boolean }

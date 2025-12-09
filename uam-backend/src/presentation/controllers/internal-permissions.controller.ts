@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Req, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
@@ -98,35 +98,54 @@ export class InternalPermissionsController {
         const tenantId = this.extractTenantId(req);
         const userId = this.extractUserId(req);
 
+        // Product scoping from header (REQUIRED for third-party backends)
+        const productIdHeader = req.headers['x-product-id'];
+        const productId =
+            typeof productIdHeader === 'string'
+                ? productIdHeader
+                : Array.isArray(productIdHeader)
+                    ? productIdHeader[0]
+                    : undefined;
+
+        if (!productId) {
+            throw new BadRequestException('x-product-id header is required');
+        }
+
         // 1. Fetch tenant products + features from SaaS backend
         const { data: tenantFeatures } = await externalHttpClient.get<TenantFeaturesResponse>(
             `/api/internal/features/tenant/${tenantId}`,
         );
 
-        // 2. Fetch aggregated feature permissions for this user
-        const userFeaturePerms = await this.getUserProductPermissionsUseCase.execute(tenantId, userId);
-        const permByFeatureId = new Map(
-            userFeaturePerms.map(p => [p.featureId, p]),
-        );
+        // 2. Filter to a single product
+        const product = tenantFeatures.products.find(p => p.productId === productId);
+        if (!product) {
+            throw new NotFoundException(`Product ${productId} not found for tenant`);
+        }
 
-        // 3. Join features with permissions and group by product
-        const products = tenantFeatures.products.map(product => ({
-            productId: product.productId,
-            productName: product.productName,
-            features: product.features.map(feature => {
-                const perm = permByFeatureId.get(feature.featureId);
-                return {
-                    featureId: feature.featureId,
-                    featureName: feature.featureName,
-                    featureCode: feature.featureCode,
-                    featureDescription: feature.featureDescription,
-                    featureType: feature.featureType,
-                    canRead: perm?.canRead ?? false,
-                    canWrite: perm?.canWrite ?? false,
-                    canExecute: perm?.canExecute ?? false,
-                };
-            }),
-        }));
+        // 3. Fetch aggregated feature permissions for this user
+        const userFeaturePerms = await this.getUserProductPermissionsUseCase.execute(tenantId, userId);
+        const permByFeatureId = new Map(userFeaturePerms.map(p => [p.featureId, p]));
+
+        // 4. Join features with permissions for this product only
+        const products = [
+            {
+                productId: product.productId,
+                productName: product.productName,
+                features: product.features.map(feature => {
+                    const perm = permByFeatureId.get(feature.featureId);
+                    return {
+                        featureId: feature.featureId,
+                        featureName: feature.featureName,
+                        featureCode: feature.featureCode,
+                        featureDescription: feature.featureDescription,
+                        featureType: feature.featureType,
+                        canRead: perm?.canRead ?? false,
+                        canWrite: perm?.canWrite ?? false,
+                        canExecute: perm?.canExecute ?? false,
+                    };
+                }),
+            },
+        ];
 
         return {
             tenantId,
