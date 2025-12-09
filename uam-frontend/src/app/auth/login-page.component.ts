@@ -1,7 +1,7 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 
 @Component({
@@ -60,14 +60,23 @@ import { AuthService } from '../core/auth.service';
     </section>
   `,
 })
-export class LoginPageComponent {
+export class LoginPageComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   email = '';
   password = '';
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+
+  private redirectUrl: string | null = null;
+
+  ngOnInit(): void {
+    this.route.queryParamMap.subscribe((params) => {
+      this.redirectUrl = params.get('redirect');
+    });
+  }
 
   onSubmit() {
     if (!this.email || !this.password) return;
@@ -78,7 +87,11 @@ export class LoginPageComponent {
     this.auth.login(this.email, this.password).subscribe({
       next: () => {
         this.loading.set(false);
-        this.router.navigate(['/roles']);
+        if (this.redirectUrl) {
+          window.location.href = this.redirectUrl;
+        } else {
+          this.router.navigate(['/roles']);
+        }
       },
       error: (err) => {
         this.loading.set(false);

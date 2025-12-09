@@ -5,15 +5,18 @@ const ACCESS_TOKEN_KEY = 'uam_access_token';
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
 
-  if (!token) {
-    return next(req);
-  }
-
-  const authReq = req.clone({
-    setHeaders: {
-      Authorization: `Bearer ${token}`,
-    },
+  // Always send credentials so HttpOnly cookies are included
+  let authReq = req.clone({
+    withCredentials: true,
   });
+
+  if (token) {
+    authReq = authReq.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
 
   return next(authReq);
 };

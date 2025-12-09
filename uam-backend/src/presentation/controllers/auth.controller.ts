@@ -1,5 +1,7 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Headers } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Headers, Get, Req, Res, UnauthorizedException, Inject } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Request, Response } from 'express';
+import { JwtService } from '@nestjs/jwt';
 import { LoginDto, RefreshTokenDto, RegisterTenantDto } from '../../application/dtos/auth';
 import { TokenResponseDto } from '../../application/dtos/auth/token-response.dto';
 import { LoginUseCase } from '../../application/use-cases/auth/login.use-case';
@@ -7,6 +9,9 @@ import { RefreshTokenUseCase } from '../../application/use-cases/auth/refresh-to
 import { LogoutUseCase } from '../../application/use-cases/auth/logout.use-case';
 import { RegisterTenantUseCase } from '../../application/use-cases/auth/register-tenant.use-case';
 import { RegisterTenantResponseDto } from '../../application/dtos/auth/register-tenant-response.dto';
+import { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import { UserMapper } from '../../application/mappers/user.mapper';
+import { UserResponseDto } from '../../application/dtos/users/user-response.dto';
 
 /**
  * Authentication Controller
@@ -20,20 +25,71 @@ export class AuthController {
         private readonly refreshTokenUseCase: RefreshTokenUseCase,
         private readonly logoutUseCase: LogoutUseCase,
         private readonly registerTenantUseCase: RegisterTenantUseCase,
+        private readonly jwtService: JwtService,
+        @Inject('IUserRepository')
+        private readonly userRepository: IUserRepository,
     ) { }
+
+    private setAuthCookie(res: Response, accessToken: string): void {
+        const isProd = process.env.NODE_ENV === 'production';
+        res.cookie('uam_access_token', accessToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: isProd,
+            path: '/',
+            maxAge: 15 * 60 * 1000, // 15 minutes
+        });
+    }
+
+    private clearAuthCookie(res: Response): void {
+        const isProd = process.env.NODE_ENV === 'production';
+        res.cookie('uam_access_token', '', {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: isProd,
+            path: '/',
+            maxAge: 0,
+        });
+    }
+
+    private extractTokenFromRequest(req: Request): string | null {
+        // 1) Try HttpOnly cookie
+        const cookieHeader = req.headers['cookie'];
+        if (cookieHeader) {
+            const cookies = cookieHeader.split(';').map((c) => c.trim());
+            const prefix = 'uam_access_token=';
+            for (const cookie of cookies) {
+                if (cookie.startsWith(prefix)) {
+                    return decodeURIComponent(cookie.substring(prefix.length));
+                }
+            }
+        }
+
+        // 2) Fallback to Authorization header
+        const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+        if (authHeader && !Array.isArray(authHeader) && authHeader.startsWith('Bearer ')) {
+            return authHeader.split(' ')[1];
+        }
+
+        return null;
+    }
 
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'User login' })
     @ApiResponse({ status: 200, description: 'Login successful', type: TokenResponseDto })
     @ApiResponse({ status: 401, description: 'Invalid credentials' })
-    async login(@Body() loginDto: LoginDto): Promise<TokenResponseDto> {
-        // For now, we'll use a hardcoded tenantId. In production, this would come from the request context
-
-        return this.loginUseCase.execute(
+    async login(
+        @Body() loginDto: LoginDto,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<TokenResponseDto> {
+        const tokens = await this.loginUseCase.execute(
             loginDto.email,
-            loginDto.password
+            loginDto.password,
         );
+
+        this.setAuthCookie(res, tokens.accessToken);
+        return tokens;
     }
 
     @Post('refresh')
@@ -41,8 +97,13 @@ export class AuthController {
     @ApiOperation({ summary: 'Refresh access token' })
     @ApiResponse({ status: 200, description: 'Token refreshed successfully', type: TokenResponseDto })
     @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-    async refresh(@Body() dto: RefreshTokenDto): Promise<TokenResponseDto> {
-        return this.refreshTokenUseCase.execute(dto.refreshToken);
+    async refresh(
+        @Body() dto: RefreshTokenDto,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<TokenResponseDto> {
+        const tokens = await this.refreshTokenUseCase.execute(dto.refreshToken);
+        this.setAuthCookie(res, tokens.accessToken);
+        return tokens;
     }
 
     @Post('logout')
@@ -50,15 +111,56 @@ export class AuthController {
     @ApiBearerAuth()
     @ApiOperation({ summary: 'User logout' })
     @ApiResponse({ status: 204, description: 'Logout successful' })
-    async logout(@Headers('authorization') authHeader: string): Promise<void> {
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            // In a real app with AuthGuard, this wouldn't be reached or would be handled there
-            // For now, we just ignore or throw
-            return;
+    async logout(
+        @Req() req: Request,
+        @Res({ passthrough: true }) res: Response,
+        @Headers('authorization') authHeader: string,
+    ): Promise<void> {
+        const tokenFromReq = this.extractTokenFromRequest(req);
+        const token =
+            tokenFromReq ||
+            (authHeader && authHeader.startsWith('Bearer ')
+                ? authHeader.split(' ')[1]
+                : null);
+
+        if (token) {
+            await this.logoutUseCase.execute(token);
         }
 
-        const token = authHeader.split(' ')[1];
-        await this.logoutUseCase.execute(token);
+        this.clearAuthCookie(res);
+    }
+
+    @Get('me')
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Get current authenticated user from token/cookie' })
+    @ApiResponse({ status: 200, description: 'Current user', type: UserResponseDto })
+    @ApiResponse({ status: 401, description: 'Not authenticated' })
+    async me(@Req() req: Request): Promise<UserResponseDto> {
+        const token = this.extractTokenFromRequest(req);
+
+        if (!token) {
+            throw new UnauthorizedException('Not authenticated');
+        }
+
+        let payload: any;
+        try {
+            payload = this.jwtService.verify(token);
+        } catch {
+            throw new UnauthorizedException('Invalid token');
+        }
+
+        const userId = payload.sub as string | undefined;
+        if (!userId) {
+            throw new UnauthorizedException('Invalid token payload');
+        }
+
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new UnauthorizedException('User not found');
+        }
+
+        return UserMapper.toResponseDto(user);
     }
 
     @Post('register-tenant')

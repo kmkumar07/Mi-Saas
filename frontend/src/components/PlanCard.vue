@@ -40,8 +40,11 @@
         v-if="!isEnterprise"
         @click="handleSubscribe"
         class="btn btn-primary btn-subscribe"
+        :disabled="subscriptionStatus === 'current'"
       >
-        Start your 14-day free trial
+        <span v-if="subscriptionStatus === 'current'">Current plan</span>
+        <span v-else-if="subscriptionStatus === 'upgrade'">Upgrade plan</span>
+        <span v-else>Start your 14-day free trial</span>
       </button>
       <button 
         v-else
@@ -63,6 +66,18 @@ const props = defineProps({
   plan: {
     type: Object,
     required: true,
+  },
+  hasActiveSubscription: {
+    type: Boolean,
+    default: false,
+  },
+  isUamAuthenticated: {
+    type: Boolean,
+    default: null,
+  },
+  subscriptionStatus: {
+    type: String,
+    default: null, // 'current' | 'upgrade' | null
   },
 });
 
@@ -231,7 +246,7 @@ const formatPrice = (price) => {
   return mainUnit.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 };
 
-const handleSubscribe = () => {
+const handleSubscribe = async () => {
   // Check if this is a plan family (not an actual plan)
   if (props.plan.metadata?.isPlanFamily) {
     alert('This is a plan family. Please contact us to get details about available plans in this family.');
@@ -244,8 +259,90 @@ const handleSubscribe = () => {
     return;
   }
 
-  subscriptionStore.setSelectedPlan(props.plan);
-  router.push(`/register/${props.plan.id}`);
+  // If user is not logged in via UAM, redirect to UAM registration page
+  if (props.isUamAuthenticated === false) {
+    const uamAppUrl = import.meta.env.VITE_UAM_APP_URL || 'http://localhost:4200';
+    const redirectUrl = encodeURIComponent(window.location.href);
+    window.location.href = `${uamAppUrl}/auth/register?redirect=${redirectUrl}`;
+    return;
+  }
+
+  // If user already has any active subscription, go to dashboard
+  if (props.hasActiveSubscription) {
+    router.push({ name: 'TenantDashboard' });
+    return;
+  }
+
+  // Logged in via UAM but no subscription yet → start Razorpay checkout for this plan
+  try {
+    const { getCurrentUser } = await import('../services/uamAuth');
+    const { apiService } = await import('../services/api');
+    const { razorpayService } = await import('../services/razorpay');
+
+    const currentUser = await getCurrentUser();
+    const tenantId = currentUser?.tenantId;
+    if (!tenantId) {
+      alert('Missing tenant information. Please refresh and try again.');
+      return;
+    }
+
+    // Get tenant to derive company name
+    const tenant = await apiService.getTenant(tenantId);
+
+    // Create billing account for this tenant
+    const account = await apiService.createAccount({
+      tenantId,
+      companyName: tenant.name || 'Workspace',
+      billingEmail: currentUser.email,
+      billingCountry: 'IN',
+    });
+
+    // Create payment order for selected plan
+    const paymentOrder = await apiService.createPaymentOrder({
+      tenantId,
+      accountId: account.id,
+      planId: props.plan.id,
+    });
+
+    if (!paymentOrder || !paymentOrder.razorpayOrderId) {
+      throw new Error('Invalid payment order response');
+    }
+
+    // Open Razorpay checkout
+    const paymentResponse = await razorpayService.openCheckout({
+      keyId: paymentOrder.keyId,
+      amount: paymentOrder.amount,
+      currency: paymentOrder.currency,
+      razorpayOrderId: paymentOrder.razorpayOrderId,
+      name: 'AG SaaS',
+      description: `Subscription for ${props.plan.name || 'Selected Plan'}`,
+      customerName: account.companyName || '',
+      customerEmail: account.billingEmail || '',
+    });
+
+    // Verify payment
+    const verificationResult = await apiService.verifyPayment({
+      orderId: paymentOrder.razorpayOrderId,
+      paymentId: paymentResponse.razorpay_payment_id,
+    });
+
+    // Redirect to success page
+    router.push({
+      name: 'PaymentSuccess',
+      query: {
+        orderId: paymentOrder.orderId,
+        paymentId: paymentResponse.razorpay_payment_id,
+      },
+    });
+  } catch (err) {
+    const message = err?.message || 'Failed to process payment. Please try again.';
+    if (message === 'Payment cancelled by user') {
+      alert('Payment was cancelled. You can try again.');
+    } else {
+      console.error('Payment error:', err);
+      alert(message);
+    }
+  }
 };
 
 const handleLearnMore = () => {

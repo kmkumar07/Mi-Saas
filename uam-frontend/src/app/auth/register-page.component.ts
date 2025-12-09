@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 
 type AccountType = 'individual' | 'company';
@@ -106,6 +106,7 @@ type AccountType = 'individual' | 'company';
 export class RegisterPageComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   accountType: AccountType = 'company';
   firstName = '';
@@ -116,6 +117,14 @@ export class RegisterPageComponent {
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+
+  private redirectUrl: string | null = null;
+
+  constructor() {
+    this.route.queryParamMap.subscribe((params) => {
+      this.redirectUrl = params.get('redirect');
+    });
+  }
 
   onSubmit() {
     if (!this.email || !this.password) return;
@@ -136,7 +145,13 @@ export class RegisterPageComponent {
       .subscribe({
         next: () => {
           this.loading.set(false);
-          this.router.navigate(['/auth/login']);
+          if (this.redirectUrl) {
+            this.router.navigate(['/auth/login'], {
+              queryParams: { redirect: this.redirectUrl },
+            });
+          } else {
+            this.router.navigate(['/auth/login']);
+          }
         },
         error: (err: any) => {
           this.loading.set(false);
@@ -146,7 +161,13 @@ export class RegisterPageComponent {
   }
 
   goToLogin() {
-    this.router.navigate(['/auth/login']);
+    if (this.redirectUrl) {
+      this.router.navigate(['/auth/login'], {
+        queryParams: { redirect: this.redirectUrl },
+      });
+    } else {
+      this.router.navigate(['/auth/login']);
+    }
   }
 }
 

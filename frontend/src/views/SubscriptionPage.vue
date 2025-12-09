@@ -14,6 +14,18 @@
 
     <main class="main-content">
       <div class="container">
+        <div
+          v-if="isUamAuthenticated && hasActiveSubscription"
+          class="dashboard-cta"
+        >
+          <p class="dashboard-cta__text">
+            You already have an active subscription.
+          </p>
+          <button class="btn btn-primary" @click="$router.push({ name: 'TenantDashboard' })">
+            Go to dashboard
+          </button>
+        </div>
+
         <div v-if="loading" class="loading">
           <p>Loading plans...</p>
         </div>
@@ -29,6 +41,9 @@
               v-for="plan in displayedPlans"
               :key="plan.id"
               :plan="plan"
+              :subscription-status="getPlanStatus(plan)"
+              :is-uam-authenticated="isUamAuthenticated"
+              :has-active-subscription="hasActiveSubscription"
             />
           </div>
         </div>
@@ -41,12 +56,20 @@
 import { ref, computed, onMounted } from 'vue';
 import PlanCard from '../components/PlanCard.vue';
 import { apiService } from '../services/api';
+import { getCurrentUser } from '../services/uamAuth';
 
 const selectedRegion = ref('IN');
 const planFamilies = ref([]);
 const plans = ref([]);
 const loading = ref(true);
 const error = ref(null);
+
+// Current subscription context from UAM (if logged in)
+const currentPlanId = ref(null);
+const currentPlanPrice = ref(null);
+const hasActiveSubscription = ref(false);
+// null = not determined yet; true/false after SSO check
+const isUamAuthenticated = ref(null);
 
 const displayedPlans = computed(() => {
   // If we have plans, use them; otherwise use plan families as fallback
@@ -80,6 +103,22 @@ const displayedPlans = computed(() => {
   }));
 });
 
+function getPlanStatus(plan) {
+  if (!currentPlanId.value) return null;
+
+  if (plan.id === currentPlanId.value) {
+    return 'current';
+  }
+
+  if (currentPlanPrice.value != null && plan.price?.value != null) {
+    if (plan.price.value > currentPlanPrice.value) {
+      return 'upgrade';
+    }
+  }
+
+  return null;
+}
+
 const loadPlans = async () => {
   loading.value = true;
   error.value = null;
@@ -112,8 +151,38 @@ const loadPlans = async () => {
   }
 };
 
+const loadCurrentSubscription = async () => {
+  try {
+    const user = await getCurrentUser();
+    if (!user?.tenantId) {
+      isUamAuthenticated.value = false;
+      return;
+    }
+
+    isUamAuthenticated.value = true;
+
+    const dashboard = await apiService.getTenantDashboard(user.tenantId);
+    const activeSubs = dashboard.subscriptions.filter(
+      (s) => s.status === 'active' || s.status === 'trial',
+    );
+
+    hasActiveSubscription.value = activeSubs.length > 0;
+    if (!activeSubs.length) return;
+
+    const primarySub = activeSubs[0];
+    currentPlanId.value = primarySub.planId;
+
+    const currentPlan = dashboard.plans.find((p) => p.id === primarySub.planId);
+    currentPlanPrice.value = currentPlan?.price?.value ?? null;
+  } catch (e) {
+    // Not logged in via UAM or dashboard not available; ignore for public landing page.
+    isUamAuthenticated.value = false;
+  }
+};
+
 onMounted(() => {
   loadPlans();
+  loadCurrentSubscription();
 });
 </script>
 
@@ -145,6 +214,24 @@ onMounted(() => {
 
 .main-content {
   padding: 60px 0;
+}
+
+.dashboard-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  margin-bottom: 24px;
+}
+
+.dashboard-cta__text {
+  margin: 0;
+  font-size: 14px;
 }
 
 .plans-container {
