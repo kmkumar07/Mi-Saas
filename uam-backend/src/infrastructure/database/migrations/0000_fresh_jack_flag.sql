@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS "uam"."oauth_tokens" (
 	CONSTRAINT "oauth_tokens_refresh_token_unique" UNIQUE("refresh_token")
 );
 --> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "uam"."product_invlovemnet_roles" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid,
+	"product_id" uuid NOT NULL,
+	"role_id" uuid NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "product_invlovemnet_roles_tenant_id_product_id_role_id_unique" UNIQUE("tenant_id","product_id","role_id")
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "uam"."role_permissions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"tenant_id" uuid,
@@ -74,7 +84,7 @@ CREATE TABLE IF NOT EXISTS "uam"."role_permissions" (
 	CONSTRAINT "role_permissions_tenant_id_role_id_feature_id_unique" UNIQUE("tenant_id","role_id","feature_id")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "uam"."system_roles" (
+CREATE TABLE IF NOT EXISTS "uam"."service_user_invlovemnet_roles" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"tenant_id" uuid,
 	"role_code" varchar(50) NOT NULL,
@@ -84,13 +94,14 @@ CREATE TABLE IF NOT EXISTS "uam"."system_roles" (
 	"hierarchy_level" integer NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "system_roles_tenant_id_role_code_unique" UNIQUE("tenant_id","role_code")
+	CONSTRAINT "service_user_invlovemnet_roles_tenant_id_role_code_unique" UNIQUE("tenant_id","role_code")
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "uam"."user_roles" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"role_id" uuid NOT NULL,
+	"product_id" uuid,
 	"assigned_by" uuid,
 	"assigned_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "user_roles_user_id_role_id_unique" UNIQUE("user_id","role_id")
@@ -129,13 +140,17 @@ CREATE INDEX IF NOT EXISTS "idx_invitations_status" ON "uam"."employee_invitatio
 CREATE INDEX IF NOT EXISTS "idx_oauth_tokens_user" ON "uam"."oauth_tokens" ("user_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_oauth_tokens_access" ON "uam"."oauth_tokens" ("access_token");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_oauth_tokens_refresh" ON "uam"."oauth_tokens" ("refresh_token");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_product_invlovemnet_roles_tenant" ON "uam"."product_invlovemnet_roles" ("tenant_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_product_invlovemnet_roles_product" ON "uam"."product_invlovemnet_roles" ("product_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_product_invlovemnet_roles_role" ON "uam"."product_invlovemnet_roles" ("role_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_role_permissions_tenant" ON "uam"."role_permissions" ("tenant_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_role_permissions_role" ON "uam"."role_permissions" ("role_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_role_permissions_feature" ON "uam"."role_permissions" ("feature_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_system_roles_tenant" ON "uam"."system_roles" ("tenant_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_system_roles_code" ON "uam"."system_roles" ("role_code");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_system_roles_tenant" ON "uam"."service_user_invlovemnet_roles" ("tenant_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_system_roles_code" ON "uam"."service_user_invlovemnet_roles" ("role_code");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_user_roles_user" ON "uam"."user_roles" ("user_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_user_roles_role" ON "uam"."user_roles" ("role_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_user_roles_product" ON "uam"."user_roles" ("product_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_users_tenant" ON "uam"."users" ("tenant_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_users_email" ON "uam"."users" ("email");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_users_email_domain" ON "uam"."users" ("email_domain");--> statement-breakpoint
@@ -159,7 +174,13 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "uam"."role_permissions" ADD CONSTRAINT "role_permissions_role_id_system_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "uam"."system_roles"("id") ON DELETE cascade ON UPDATE no action;
+ ALTER TABLE "uam"."product_invlovemnet_roles" ADD CONSTRAINT "product_invlovemnet_roles_role_id_service_user_invlovemnet_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "uam"."service_user_invlovemnet_roles"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "uam"."role_permissions" ADD CONSTRAINT "role_permissions_role_id_service_user_invlovemnet_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "uam"."service_user_invlovemnet_roles"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
@@ -171,7 +192,7 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "uam"."user_roles" ADD CONSTRAINT "user_roles_role_id_system_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "uam"."system_roles"("id") ON DELETE cascade ON UPDATE no action;
+ ALTER TABLE "uam"."user_roles" ADD CONSTRAINT "user_roles_role_id_service_user_invlovemnet_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "uam"."service_user_invlovemnet_roles"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;

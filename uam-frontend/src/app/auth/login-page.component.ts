@@ -84,7 +84,7 @@ export class LoginPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.auth.login(this.email, this.password).subscribe({
+        this.auth.login(this.email, this.password).subscribe({
       next: () => {
         this.loading.set(false);
         if (this.redirectUrl) {

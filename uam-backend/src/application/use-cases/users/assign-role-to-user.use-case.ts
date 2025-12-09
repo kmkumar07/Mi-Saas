@@ -21,7 +21,7 @@ export class AssignRoleToUserUseCase {
         private readonly roleRepository: ISystemRoleRepository,
     ) { }
 
-    async execute(userId: string, roleId: string, assignedBy?: string): Promise<UserRoleResponseDto> {
+    async execute(userId: string, roleId: string, productId?: string, assignedBy?: string): Promise<UserRoleResponseDto> {
         // 1. Validate user exists
         const user = await this.userRepository.findById(userId);
         if (!user) {
@@ -34,7 +34,7 @@ export class AssignRoleToUserUseCase {
             throw new NotFoundException(`Role with ID ${roleId} not found`);
         }
 
-        // 3. Check if assignment already exists
+        // 3. Check if assignment already exists (currently per user+role, product optional)
         const existingAssignment = await this.userRoleRepository.findByUserIdAndRoleId(userId, roleId);
         if (existingAssignment) {
             throw new ConflictException('Role already assigned to user');
@@ -44,6 +44,7 @@ export class AssignRoleToUserUseCase {
         const userRole = UserRole.create({
             userId,
             roleId,
+            productId,
             assignedBy,
         });
 

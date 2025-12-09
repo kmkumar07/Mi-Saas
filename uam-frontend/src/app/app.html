@@ -16,7 +16,39 @@
     </div>
   </header>
 
-  <main class="app-main">
-    <router-outlet />
-  </main>
+  <div class="app-body">
+    <aside class="app-sidebar" *ngIf="isAuthenticated()">
+      <nav class="app-menu">
+        <a
+          routerLink="/roles"
+          routerLinkActive="app-menu__item--active"
+          class="app-menu__item"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          <span class="app-menu__icon">📋</span>
+          <span class="app-menu__label">Roles</span>
+        </a>
+        <a
+          routerLink="/invitations"
+          routerLinkActive="app-menu__item--active"
+          class="app-menu__item"
+        >
+          <span class="app-menu__icon">👥</span>
+          <span class="app-menu__label">Employees</span>
+        </a>
+        <a
+          routerLink="/roles/create"
+          routerLinkActive="app-menu__item--active"
+          class="app-menu__item"
+        >
+          <span class="app-menu__icon">➕</span>
+          <span class="app-menu__label">Create new role</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="app-main">
+      <router-outlet />
+    </main>
+  </div>
 </div>

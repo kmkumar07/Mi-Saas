@@ -1,11 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { UsersService, User } from '../core/users.service';
 
 @Component({
   selector: 'app-users-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   template: `
     <section class="page">
       <header class="page__header">
@@ -15,6 +16,23 @@ import { UsersService, User } from '../core/users.service';
             View and manage users for the current tenant.
           </p>
         </div>
+        <nav class="page__tabs">
+          <a
+            class="page__tab page__tab--active"
+            [routerLink]="['/users']"
+            routerLinkActive="page__tab--active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Users
+          </a>
+          <a
+            class="page__tab"
+            [routerLink]="['/invitations']"
+            routerLinkActive="page__tab--active"
+          >
+            Employees
+          </a>
+        </nav>
       </header>
 
       <div class="table-card">

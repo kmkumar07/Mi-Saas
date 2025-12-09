@@ -14,6 +14,9 @@ export class UserRoleResponseDto {
     @ApiProperty({ description: 'Role ID' })
     roleId: string;
 
+    @ApiProperty({ description: 'Product ID for which the role is assigned', required: false })
+    productId?: string | null;
+
     @ApiProperty({ description: 'ID of user who assigned the role', required: false })
     assignedBy?: string | null;
 

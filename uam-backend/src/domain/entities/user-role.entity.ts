@@ -2,6 +2,7 @@ export interface UserRoleProps {
     id: string;
     userId: string;
     roleId: string;
+    productId?: string | null;
     assignedBy?: string | null;
     assignedAt: Date;
 }
@@ -39,6 +40,10 @@ export class UserRole {
 
     get roleId(): string {
         return this.props.roleId;
+    }
+
+    get productId(): string | null | undefined {
+        return this.props.productId;
     }
 
     get assignedBy(): string | null | undefined {

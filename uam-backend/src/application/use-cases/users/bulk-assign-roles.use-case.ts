@@ -21,7 +21,7 @@ export class BulkAssignRolesUseCase {
         private readonly roleRepository: ISystemRoleRepository,
     ) { }
 
-    async execute(userId: string, roleIds: string[], assignedBy?: string): Promise<UserRoleResponseDto[]> {
+    async execute(userId: string, roleIds: string[], productId?: string, assignedBy?: string): Promise<UserRoleResponseDto[]> {
         // 1. Validate user exists
         const user = await this.userRepository.findById(userId);
         if (!user) {
@@ -52,6 +52,7 @@ export class BulkAssignRolesUseCase {
             UserRole.create({
                 userId,
                 roleId,
+                productId,
                 assignedBy,
             })
         );

@@ -46,6 +46,10 @@ export class RolesService {
     return this.http.get<Role[]>(`${API_BASE_URL}/api/roles`);
   }
 
+  getRole(id: string) {
+    return this.http.get<Role>(`${API_BASE_URL}/api/roles/${id}`);
+  }
+
   createRole(input: {
     roleCode: string;
     roleName: string;
@@ -53,6 +57,10 @@ export class RolesService {
     hierarchyLevel: number;
   }) {
     return this.http.post<Role>(`${API_BASE_URL}/api/roles`, input);
+  }
+
+  updateRole(id: string, input: Partial<Omit<Role, 'id' | 'isSystemRole'>>) {
+    return this.http.put<Role>(`${API_BASE_URL}/api/roles/${id}`, input);
   }
 
   bulkAssignPermissions(roleId: string, rows: PermissionMatrixRow[]) {
@@ -95,6 +103,22 @@ export class RolesService {
           return rows;
         }),
       );
+  }
+
+  /**
+   * Load existing permissions for a specific role.
+   */
+  getRolePermissions(roleId: string) {
+    return this.http.get<
+      {
+        id: string;
+        roleId: string;
+        featureId: string;
+        canRead: boolean;
+        canWrite: boolean;
+        canExecute: boolean;
+      }[]
+    >(`${API_BASE_URL}/api/roles/${roleId}/permissions`);
   }
 }
 

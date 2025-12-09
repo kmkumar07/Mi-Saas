@@ -1,5 +1,5 @@
 {
-  "id": "cb1192ff-46b7-403b-a61a-2b7783d29a44",
+  "id": "4d7f2427-3260-4625-be09-d188f3d8edd7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "5",
   "dialect": "pg",
@@ -372,6 +372,102 @@
         }
       }
     },
+    "product_invlovemnet_roles": {
+      "name": "product_invlovemnet_roles",
+      "schema": "uam",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_product_invlovemnet_roles_tenant": {
+          "name": "idx_product_invlovemnet_roles_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        },
+        "idx_product_invlovemnet_roles_product": {
+          "name": "idx_product_invlovemnet_roles_product",
+          "columns": [
+            "product_id"
+          ],
+          "isUnique": false
+        },
+        "idx_product_invlovemnet_roles_role": {
+          "name": "idx_product_invlovemnet_roles_role",
+          "columns": [
+            "role_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "product_invlovemnet_roles_role_id_service_user_invlovemnet_roles_id_fk": {
+          "name": "product_invlovemnet_roles_role_id_service_user_invlovemnet_roles_id_fk",
+          "tableFrom": "product_invlovemnet_roles",
+          "tableTo": "service_user_invlovemnet_roles",
+          "schemaTo": "uam",
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "product_invlovemnet_roles_tenant_id_product_id_role_id_unique": {
+          "name": "product_invlovemnet_roles_tenant_id_product_id_role_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "product_id",
+            "role_id"
+          ]
+        }
+      }
+    },
     "role_permissions": {
       "name": "role_permissions",
       "schema": "uam",
@@ -461,10 +557,10 @@
         }
       },
       "foreignKeys": {
-        "role_permissions_role_id_system_roles_id_fk": {
-          "name": "role_permissions_role_id_system_roles_id_fk",
+        "role_permissions_role_id_service_user_invlovemnet_roles_id_fk": {
+          "name": "role_permissions_role_id_service_user_invlovemnet_roles_id_fk",
           "tableFrom": "role_permissions",
-          "tableTo": "system_roles",
+          "tableTo": "service_user_invlovemnet_roles",
           "schemaTo": "uam",
           "columnsFrom": [
             "role_id"
@@ -489,8 +585,8 @@
         }
       }
     },
-    "system_roles": {
-      "name": "system_roles",
+    "service_user_invlovemnet_roles": {
+      "name": "service_user_invlovemnet_roles",
       "schema": "uam",
       "columns": {
         "id": {
@@ -571,8 +667,8 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "system_roles_tenant_id_role_code_unique": {
-          "name": "system_roles_tenant_id_role_code_unique",
+        "service_user_invlovemnet_roles_tenant_id_role_code_unique": {
+          "name": "service_user_invlovemnet_roles_tenant_id_role_code_unique",
           "nullsNotDistinct": false,
           "columns": [
             "tenant_id",
@@ -604,6 +700,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "assigned_by": {
           "name": "assigned_by",
           "type": "uuid",
@@ -632,6 +734,13 @@
             "role_id"
           ],
           "isUnique": false
+        },
+        "idx_user_roles_product": {
+          "name": "idx_user_roles_product",
+          "columns": [
+            "product_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -649,10 +758,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "user_roles_role_id_system_roles_id_fk": {
-          "name": "user_roles_role_id_system_roles_id_fk",
+        "user_roles_role_id_service_user_invlovemnet_roles_id_fk": {
+          "name": "user_roles_role_id_service_user_invlovemnet_roles_id_fk",
           "tableFrom": "user_roles",
-          "tableTo": "system_roles",
+          "tableTo": "service_user_invlovemnet_roles",
           "schemaTo": "uam",
           "columnsFrom": [
             "role_id"

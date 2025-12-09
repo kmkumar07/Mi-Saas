@@ -104,7 +104,7 @@ export class UsersController {
     ): Promise<UserRoleResponseDto> {
         // Hardcoded assignedBy for now
         const assignedBy = '00000000-0000-0000-0000-000000000000';
-        return this.assignRoleToUserUseCase.execute(id, dto.roleId, assignedBy);
+        return this.assignRoleToUserUseCase.execute(id, dto.roleId, dto.productId, assignedBy);
     }
 
     @Delete(':id/roles/:roleId')
@@ -128,6 +128,6 @@ export class UsersController {
     ): Promise<UserRoleResponseDto[]> {
         // Hardcoded assignedBy for now
         const assignedBy = '00000000-0000-0000-0000-000000000000';
-        return this.bulkAssignRolesUseCase.execute(id, dto.roleIds, assignedBy);
+        return this.bulkAssignRolesUseCase.execute(id, dto.roleIds, dto.productId, assignedBy);
     }
 }

@@ -11,6 +11,7 @@ export class UserRoleMapper {
         dto.id = userRole.id;
         dto.userId = userRole.userId;
         dto.roleId = userRole.roleId;
+        dto.productId = userRole.productId ?? null;
         dto.assignedBy = userRole.assignedBy;
         dto.assignedAt = userRole.assignedAt;
         return dto;

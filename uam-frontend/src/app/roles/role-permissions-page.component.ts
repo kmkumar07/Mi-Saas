@@ -1,46 +1,31 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RolesService, PermissionMatrixRow } from '../core/roles.service';
+import { ActivatedRoute } from '@angular/router';
+import { RolesService, PermissionMatrixRow, Role } from '../core/roles.service';
 
 @Component({
-  selector: 'app-role-matrix-page',
+  selector: 'app-role-permissions-page',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
     <section class="page">
       <header class="page__header">
         <div>
-          <h2>Create role</h2>
+          <h2>Edit role permissions</h2>
           <p class="page__subtitle">
-            Choose the features this role can read, write, and delete.
+            Update which features this role can read, write, and delete.
           </p>
+          <div *ngIf="role()">
+            <strong>{{ role()?.roleName }}</strong>
+            <span class="page__subtitle-muted">
+              ({{ role()?.roleCode }} · level {{ role()?.hierarchyLevel }})
+            </span>
+          </div>
         </div>
       </header>
 
       <form (ngSubmit)="onSubmit()" class="role-form">
-        <div class="role-form__meta">
-          <label>
-            <span>Role name</span>
-            <input type="text" [(ngModel)]="roleName" name="roleName" required />
-          </label>
-          <label>
-            <span>Role code</span>
-            <input type="text" [(ngModel)]="roleCode" name="roleCode" required />
-          </label>
-          <label>
-            <span>Hierarchy level (1–4)</span>
-            <input
-              type="number"
-              [(ngModel)]="hierarchyLevel"
-              name="hierarchyLevel"
-              min="1"
-              max="4"
-              required
-            />
-          </label>
-        </div>
-
         <div class="matrix-card">
           <table class="matrix">
             <thead>
@@ -134,30 +119,35 @@ import { RolesService, PermissionMatrixRow } from '../core/roles.service';
             type="submit"
             [disabled]="submitting() || !hasAnyPermission()"
           >
-            {{ submitting() ? 'Creating role…' : 'Create role with permissions' }}
+            {{ submitting() ? 'Saving…' : 'Save permissions' }}
           </button>
         </div>
       </form>
     </section>
   `,
 })
-export class RoleMatrixPageComponent implements OnInit {
+export class RolePermissionsPageComponent implements OnInit {
   private readonly rolesService = inject(RolesService);
-
-  roleName = '';
-  roleCode = '';
-  hierarchyLevel = 3;
+  private readonly route = inject(ActivatedRoute);
 
   private readonly _rows = signal<PermissionMatrixRow[]>([]);
-
   readonly rows = computed(() => this._rows());
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
   readonly success = signal<string | null>(null);
+  readonly role = signal<Role | null>(null);
+
+  private roleId: string | null = null;
 
   ngOnInit(): void {
-    this.loadFeatures();
+    this.roleId = this.route.snapshot.paramMap.get('id');
+    if (!this.roleId) {
+      this.error.set('Missing role identifier in URL.');
+      return;
+    }
+
+    this.loadRoleAndPermissions(this.roleId);
   }
 
   isGroupHeader(_row: PermissionMatrixRow): boolean {
@@ -218,7 +208,7 @@ export class RoleMatrixPageComponent implements OnInit {
   }
 
   onSubmit() {
-    if (!this.roleName || !this.roleCode || !this.hasAnyPermission()) {
+    if (!this.roleId || !this.hasAnyPermission()) {
       return;
     }
 
@@ -226,41 +216,67 @@ export class RoleMatrixPageComponent implements OnInit {
     this.error.set(null);
     this.success.set(null);
 
-    this.rolesService
-      .createRole({
-        roleName: this.roleName,
-        roleCode: this.roleCode,
-        hierarchyLevel: this.hierarchyLevel,
-      })
-      .subscribe({
-        next: (role) => {
-          this.rolesService
-            .bulkAssignPermissions(role.id, this._rows())
-            .subscribe({
-              next: () => {
-                this.submitting.set(false);
-                this.success.set('Role and permissions created successfully.');
-              },
-              error: (err) => {
-                this.submitting.set(false);
-                this.error.set(
-                  err?.error?.message ?? 'Role created, but assigning permissions failed.',
-                );
-              },
-            });
-        },
-        error: (err) => {
-          this.submitting.set(false);
-          this.error.set(err?.error?.message ?? 'Failed to create role.');
-        },
-      });
+    this.rolesService.bulkAssignPermissions(this.roleId, this._rows()).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.success.set('Permissions updated successfully.');
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.message ?? 'Failed to update permissions.');
+      },
+    });
   }
 
-  private loadFeatures() {
+  private loadRoleAndPermissions(roleId: string) {
     this.error.set(null);
+
+    // Load the role details and its permissions, plus the tenant feature matrix
+    this.rolesService.getRole(roleId).subscribe({
+      next: (role) => this.role.set(role),
+      error: (err) => {
+        this.error.set(err?.error?.message ?? 'Failed to load role details.');
+      },
+    });
+
     this.rolesService.loadPermissionMatrix().subscribe({
       next: (rows) => {
-        this._rows.set(rows);
+        // Once we have the base matrix, overlay existing permissions
+        this.rolesService.getRolePermissions(roleId).subscribe({
+          next: (perms) => {
+            const byFeature = new Map(
+              perms.map((p) => [
+                p.featureId,
+                {
+                  canRead: p.canRead,
+                  canWrite: p.canWrite,
+                  canExecute: p.canExecute,
+                },
+              ]),
+            );
+
+            const merged = rows.map((row) => {
+              const existing = byFeature.get(row.featureId);
+              if (!existing) return row;
+              return {
+                ...row,
+                canRead: existing.canRead,
+                canWrite: existing.canWrite,
+                canExecute: existing.canExecute,
+              };
+            });
+
+            this._rows.set(merged);
+          },
+          error: (err) => {
+            // If permissions fail to load, still show matrix with defaults
+            this._rows.set(rows);
+            this.error.set(
+              err?.error?.message ??
+                'Failed to load existing permissions. You can still set new ones.',
+            );
+          },
+        });
       },
       error: (err: any) => {
         this.error.set(err?.error?.message ?? 'Failed to load features for this tenant.');

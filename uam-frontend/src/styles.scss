@@ -10,8 +10,8 @@ body {
   padding: 0;
   height: 100%;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: radial-gradient(circle at top left, #1f2933, #020617);
-  color: #e5e7eb;
+  background: radial-gradient(circle at top left, #fdf2ff, #e0f2fe);
+  color: #334155;
 }
 
 body {
@@ -38,18 +38,20 @@ app-root {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  color: #f9fafb;
+  background: linear-gradient(135deg, #c4b5fd, #93c5fd);
+  color: #0f172a;
+  border-color: #a5b4fc;
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
+  background: linear-gradient(135deg, #a5b4fc, #7dd3fc);
 }
 
 .btn-secondary {
-  background-color: #111827;
-  border-color: #374151;
-  color: #e5e7eb;
+  background-color: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
 }
 
 .page {
@@ -57,8 +59,9 @@ app-root {
   margin: 2rem auto;
   padding: 1.5rem;
   border-radius: 1.25rem;
-  background-color: rgba(15, 23, 42, 0.92);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.75);
+  background-color: #ffffff;
+  box-shadow: 0 18px 45px rgba(148, 163, 184, 0.25);
+  border: 1px solid #e2e8f0;
 }
 
 .page__header {
@@ -76,7 +79,7 @@ app-root {
 .page__subtitle {
   margin: 0.3rem 0 0;
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
 .auth-page {
@@ -91,8 +94,9 @@ app-root {
   max-width: 420px;
   padding: 1.8rem;
   border-radius: 1.25rem;
-  background-color: rgba(15, 23, 42, 0.96);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.75);
+  background-color: #ffffff;
+  box-shadow: 0 18px 45px rgba(148, 163, 184, 0.25);
+  border: 1px solid #e2e8f0;
 }
 
 .auth-card--wide {
@@ -107,7 +111,7 @@ app-root {
 .auth-card__subtitle {
   margin: 0 0 1.5rem;
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
 .auth-form {
@@ -134,15 +138,15 @@ app-root {
 }
 
 .auth-field span {
-  color: #d1d5db;
+  color: #64748b;
 }
 
 .auth-field input {
   border-radius: 0.75rem;
-  border: 1px solid #374151;
-  background-color: #020617;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
   padding: 0.5rem 0.75rem;
-  color: #e5e7eb;
+  color: #0f172a;
   font-size: 0.8rem;
 }
 
@@ -150,9 +154,9 @@ app-root {
   grid-column: 1 / -1;
   padding: 0.5rem 0.75rem;
   border-radius: 0.75rem;
-  background-color: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.4);
-  color: #fecaca;
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
   font-size: 0.78rem;
 }
 
@@ -166,11 +170,11 @@ app-root {
 .auth-card__footer {
   margin-top: 1rem;
   font-size: 0.78rem;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
 .auth-card__footer a {
-  color: #a855f7;
+  color: #818cf8;
   text-decoration: none;
 }
 
@@ -179,7 +183,7 @@ app-root {
   border: none;
   padding: 0;
   margin-left: 0.25rem;
-  color: #a855f7;
+  color: #818cf8;
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
@@ -201,17 +205,17 @@ app-root {
 
 .role-form__meta input {
   border-radius: 0.75rem;
-  border: 1px solid #374151;
-  background-color: #020617;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
   padding: 0.45rem 0.75rem;
-  color: #e5e7eb;
+  color: #0f172a;
   font-size: 0.8rem;
 }
 
 .matrix-card {
   border-radius: 1rem;
-  border: 1px solid #1f2937;
-  background-color: #020617;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
   overflow: hidden;
 }
 
@@ -222,7 +226,7 @@ app-root {
 }
 
 .matrix thead {
-  background-color: #0b1120;
+  background-color: #f9fafb;
 }
 
 .matrix th,
@@ -233,11 +237,11 @@ app-root {
 
 .matrix th {
   font-weight: 600;
-  color: #9ca3af;
+  color: #64748b;
 }
 
 .matrix__feature {
-  color: #f9fafb;
+  color: #0f172a;
 }
 
 .matrix__cell {
@@ -257,15 +261,15 @@ app-root {
 }
 
 .role-error {
-  background-color: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.4);
-  color: #fecaca;
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
 }
 
 .role-success {
-  background-color: rgba(52, 211, 153, 0.1);
-  border: 1px solid rgba(52, 211, 153, 0.4);
-  color: #bbf7d0;
+  background-color: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #166534;
 }
 
 .role-actions {
@@ -277,8 +281,8 @@ app-root {
 .table-card {
   margin-top: 1rem;
   border-radius: 1rem;
-  border: 1px solid #1f2937;
-  background-color: #020617;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
   overflow: hidden;
 }
 
@@ -289,7 +293,7 @@ app-root {
 }
 
 .table thead {
-  background-color: #0b1120;
+  background-color: #f9fafb;
 }
 
 .table th,
@@ -300,11 +304,11 @@ app-root {
 .table__empty {
   text-align: center;
   padding: 1.5rem 0.75rem;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
 .table__empty--error {
-  color: #fecaca;
+  color: #b91c1c;
 }
 
 .badge {
@@ -313,18 +317,18 @@ app-root {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   font-size: 0.7rem;
-  border: 1px solid #4b5563;
-  color: #e5e7eb;
+  border: 1px solid #e2e8f0;
+  color: #475569;
 }
 
 .badge--success {
-  border-color: #10b981;
-  background-color: rgba(16, 185, 129, 0.1);
+  border-color: #bbf7d0;
+  background-color: #dcfce7;
 }
 
 .badge--muted {
-  border-color: #4b5563;
-  background-color: rgba(31, 41, 55, 0.6);
+  border-color: #e2e8f0;
+  background-color: #f8fafc;
 }
 
 .user-cell {
@@ -337,7 +341,7 @@ app-root {
   width: 1.8rem;
   height: 1.8rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
+  background: linear-gradient(135deg, #bfdbfe, #f5d0fe);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -350,7 +354,7 @@ app-root {
 
 .user-cell__email {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
 .invite-form {
@@ -370,24 +374,24 @@ app-root {
 
 .invite-form input {
   border-radius: 0.75rem;
-  border: 1px solid #374151;
-  background-color: #020617;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
   padding: 0.45rem 0.75rem;
-  color: #e5e7eb;
+  color: #0f172a;
   font-size: 0.8rem;
 }
 
 .account-type {
   grid-column: 1 / -1;
   border-radius: 0.75rem;
-  border: 1px solid #374151;
+  border: 1px solid #e2e8f0;
   padding: 0.5rem 0.75rem;
 }
 
 .account-type legend {
   padding: 0 0.25rem;
   font-size: 0.78rem;
-  color: #d1d5db;
+  color: #64748b;
 }
 
 .account-type label {

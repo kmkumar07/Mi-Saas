@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsArray, IsUUID, ArrayMinSize } from 'class-validator';
+import { IsNotEmpty, IsArray, IsUUID, ArrayMinSize, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -16,4 +16,13 @@ export class BulkAssignRolesDto {
     @IsUUID('4', { each: true, message: 'Each role ID must be a valid UUID' })
     @IsNotEmpty({ message: 'Role IDs are required' })
     roleIds: string[];
+
+    @ApiProperty({
+        description: 'Product ID for which the roles are being assigned (optional, applies to all roleIds)',
+        example: '223e4567-e89b-12d3-a456-426614174000',
+        required: false,
+    })
+    @IsUUID('4', { message: 'Invalid product ID format' })
+    @IsOptional()
+    productId?: string;
 }

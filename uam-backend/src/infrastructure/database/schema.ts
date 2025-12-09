@@ -26,12 +26,13 @@ export const invitationStatusEnum = uamSchema.enum('invitation_status', [
 // ============================
 
 /**
- * System Roles Table
+ * Service User Involvement Roles Table
+ * (renamed from system_roles)
  * Stores predefined system roles and tenant-specific custom roles
  * tenant_id = NULL for global system roles
  */
 export const systemRoles = uamSchema.table(
-    'system_roles',
+    'service_user_invlovemnet_roles',
     {
         id: uuid('id').primaryKey().defaultRandom(),
         tenantId: uuid('tenant_id'), // NULL for global roles
@@ -108,6 +109,8 @@ export const userRoles = uamSchema.table(
         id: uuid('id').primaryKey().defaultRandom(),
         userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
         roleId: uuid('role_id').notNull().references(() => systemRoles.id, { onDelete: 'cascade' }),
+        // Optional product scope for the user-role assignment
+        productId: uuid('product_id'),
         assignedBy: uuid('assigned_by').references(() => users.id),
         assignedAt: timestamp('assigned_at').defaultNow().notNull(),
     },
@@ -115,6 +118,29 @@ export const userRoles = uamSchema.table(
         uniqueUserRole: unique().on(table.userId, table.roleId),
         userIdx: index('idx_user_roles_user').on(table.userId),
         roleIdx: index('idx_user_roles_role').on(table.roleId),
+        productIdx: index('idx_user_roles_product').on(table.productId),
+    })
+);
+
+/**
+ * Product Involvement Roles Table
+ * Links products to roles (cross-schema reference to subscription products)
+ */
+export const productInvlovemnetRoles = uamSchema.table(
+    'product_invlovemnet_roles',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        tenantId: uuid('tenant_id'), // NULL for global mappings
+        productId: uuid('product_id').notNull(), // FK to subscription.products (cross-schema)
+        roleId: uuid('role_id').notNull().references(() => systemRoles.id, { onDelete: 'cascade' }),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        uniqueTenantProductRole: unique().on(table.tenantId, table.productId, table.roleId),
+        tenantIdx: index('idx_product_invlovemnet_roles_tenant').on(table.tenantId),
+        productIdx: index('idx_product_invlovemnet_roles_product').on(table.productId),
+        roleIdx: index('idx_product_invlovemnet_roles_role').on(table.roleId),
     })
 );
 

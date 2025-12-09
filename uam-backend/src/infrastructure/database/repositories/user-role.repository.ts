@@ -87,6 +87,7 @@ export class UserRoleRepository implements IUserRoleRepository {
             id: row.id,
             userId: row.userId,
             roleId: row.roleId,
+            productId: row.productId,
             assignedBy: row.assignedBy,
             assignedAt: row.assignedAt,
         });

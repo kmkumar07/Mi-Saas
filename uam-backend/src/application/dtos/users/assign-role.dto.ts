@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -13,4 +13,13 @@ export class AssignRoleDto {
     @IsUUID('4', { message: 'Invalid role ID format' })
     @IsNotEmpty({ message: 'Role ID is required' })
     roleId: string;
+
+    @ApiProperty({
+        description: 'Product ID for which the role is being assigned (optional)',
+        example: '223e4567-e89b-12d3-a456-426614174000',
+        required: false,
+    })
+    @IsUUID('4', { message: 'Invalid product ID format' })
+    @IsOptional()
+    productId?: string;
 }
