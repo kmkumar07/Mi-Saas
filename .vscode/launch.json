@@ -1,0 +1,82 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend: Local Debug NestJS",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "program": "${workspaceFolder}/backend/node_modules/@nestjs/cli/bin/nest.js",
+      "args": ["start", "--watch"],
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/backend/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "UAM Backend: Local Debug NestJS",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/uam-backend",
+      "program": "${workspaceFolder}/uam-backend/node_modules/@nestjs/cli/bin/nest.js",
+      "args": ["start", "--watch"],
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/uam-backend/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Thirdparty Backend: Local Debug NestJS",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/thirdparty-backend",
+      "program": "${workspaceFolder}/thirdparty-backend/node_modules/@nestjs/cli/bin/nest.js",
+      "args": ["start", "--watch"],
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/thirdparty-backend/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Backend: Attach (Docker)",
+      "type": "node",
+      "request": "attach",
+      "address": "localhost",
+      "port": 9229,
+      "localRoot": "${workspaceFolder}/backend",
+      "remoteRoot": "/usr/src/app",
+      "protocol": "inspector",
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "UAM Backend: Attach (Docker)",
+      "type": "node",
+      "request": "attach",
+      "address": "localhost",
+      "port": 9230,
+      "localRoot": "${workspaceFolder}/uam-backend",
+      "remoteRoot": "/usr/src/app",
+      "protocol": "inspector",
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Thirdparty Backend: Attach (Docker)",
+      "type": "node",
+      "request": "attach",
+      "address": "localhost",
+      "port": 9231,
+      "localRoot": "${workspaceFolder}/thirdparty-backend",
+      "remoteRoot": "/usr/src/app",
+      "protocol": "inspector",
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}
+
+

@@ -122,11 +122,19 @@ export class RecordUsageUseCase {
             }
         }
 
-        // 6. If limit exceeded, throw error
+        // 6. If limit exceeded, do NOT record a new usage event.
+        //    Instead, return a structured response indicating the limit has been hit.
         if (limitExceeded) {
-            throw new BadRequestException(
-                `Usage limit exceeded for feature '${dto.featureCode}'. Current: ${currentUsed}, Attempted: ${dto.usage}, Limit: ${limit}, Total would be: ${newTotalUsed}`
-            );
+            return {
+                featureCode: dto.featureCode.toUpperCase(),
+                // No additional usage is recorded when the limit is exceeded
+                usage: 0,
+                // Total used stays at the previously recorded value
+                totalUsed: currentUsed,
+                limit: limit,
+                limitExceeded: true,
+                remaining: limit !== null ? Math.max(0, limit - currentUsed) : null,
+            };
         }
 
         // 7. Create usage event entity

@@ -18,10 +18,10 @@ export class UsageController {
     @ApiBody({ type: RecordUsageDto })
     @ApiResponse({
         status: 200,
-        description: 'Usage recorded successfully',
+        description: 'Usage recorded successfully (or limit reached with detailed status)',
         type: RecordUsageResponseDto,
     })
-    @ApiResponse({ status: 400, description: 'Invalid input data or usage limit exceeded' })
+    @ApiResponse({ status: 400, description: 'Invalid input data' })
     @ApiResponse({ status: 404, description: 'Feature not found or no active subscriptions' })
     @ApiResponse({ status: 422, description: 'Validation error' })
     async recordUsage(@Body() dto: RecordUsageDto): Promise<RecordUsageResponseDto> {

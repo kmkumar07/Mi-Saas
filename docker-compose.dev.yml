@@ -2,16 +2,18 @@ version: "3.9"
 
 services:
   postgres:
-    image: postgres:16
-    container_name: ag-saas-postgres
+    image: postgres:18
+    container_name: pg
     restart: unless-stopped
-    env_file:
-      # Define POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, etc. here
-      - ./backend/.env.db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: SaasDB
+      PGDATA: /var/lib/postgresql/18/docker
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/18/docker
 
   backend:
     build:
@@ -20,9 +22,12 @@ services:
     container_name: ag-saas-backend
     env_file:
       - ./backend/.env
+    environment:
+      - NODE_OPTIONS=--inspect=0.0.0.0:9229
     command: npm run start:dev
     ports:
       - "3000:3000"
+      - "9229:9229"
     volumes:
       # Mount only the source for hot reload, keep node_modules inside container
       - ./backend/src:/usr/src/app/src
@@ -36,9 +41,12 @@ services:
     container_name: ag-saas-uam-backend
     env_file:
       - ./uam-backend/.env
+    environment:
+      - NODE_OPTIONS=--inspect=0.0.0.0:9229
     command: npm run start:dev
     ports:
       - "3001:3001"
+      - "9230:9229"
     volumes:
       - ./uam-backend/src:/usr/src/app/src
     depends_on:
@@ -51,9 +59,12 @@ services:
     container_name: ag-saas-thirdparty-backend
     env_file:
       - ./thirdparty-backend/.env
+    environment:
+      - NODE_OPTIONS=--inspect=0.0.0.0:9229
     command: npm run start:dev
     ports:
       - "5003:5003"
+      - "9231:9229"
     volumes:
       - ./thirdparty-backend/src:/usr/src/app/src
     depends_on:

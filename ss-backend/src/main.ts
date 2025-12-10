@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { AggregateErrorLoggingFilter } from './presentation/filters/aggregate-error-logging.filter';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
@@ -35,6 +37,10 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api', app, document);
+
+    // Global exception filter to log inner errors from AggregateError instances
+    const { httpAdapter } = app.get(HttpAdapterHost);
+    app.useGlobalFilters(new AggregateErrorLoggingFilter(httpAdapter));
 
     const port = process.env.PORT || 3000;
     await app.listen(port);
