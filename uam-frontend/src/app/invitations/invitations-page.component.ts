@@ -38,6 +38,7 @@ import { RolesService, Role } from '../core/roles.service';
           <thead>
             <tr>
               <th>Email</th>
+              <th>Roles</th>
               <th>Status</th>
               <th>Expires</th>
               <th>Actions</th>
@@ -45,15 +46,23 @@ import { RolesService, Role } from '../core/roles.service';
           </thead>
           <tbody>
             <tr *ngIf="loading()">
-              <td colspan="4" class="table__empty">Loading invitations…</td>
+              <td colspan="5" class="table__empty">Loading invitations…</td>
             </tr>
             <tr *ngIf="!loading() && error()">
-              <td colspan="4" class="table__empty table__empty--error">
+              <td colspan="5" class="table__empty table__empty--error">
                 {{ error() }}
               </td>
             </tr>
             <tr *ngFor="let inv of invitations()">
               <td>{{ inv.email }}</td>
+              <td>
+                <ng-container *ngIf="inv.roleIds.length; else noRoles">
+                  {{ getRoleNames(inv) }}
+                </ng-container>
+                <ng-template #noRoles>
+                  <span class="text-muted">No roles</span>
+                </ng-template>
+              </td>
               <td>
                 <span
                   class="badge"
@@ -292,6 +301,22 @@ export class InvitationsPageComponent implements OnInit {
         this.inviteError.set(err?.error?.message ?? 'Failed to activate user.');
       },
       });
+  }
+
+  /**
+   * Resolve human-readable role names for an invitation based on its roleIds.
+   */
+  getRoleNames(inv: Invitation): string {
+    const allRoles = this.roles();
+    if (!inv.roleIds?.length || !allRoles?.length) {
+      return '';
+    }
+
+    const names = allRoles
+      .filter((role) => inv.roleIds.includes(role.id))
+      .map((role) => role.roleName);
+
+    return names.length ? names.join(', ') : '';
   }
 }
 

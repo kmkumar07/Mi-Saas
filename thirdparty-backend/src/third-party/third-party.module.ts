@@ -5,11 +5,13 @@ import { ThirdPartyController } from './third-party.controller';
 import { AuthMiddleware } from '../auth/auth.middleware';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 import { AuthModule } from '../auth/auth.module';
+import { UsageService } from './usage.service';
 
 @Module({
   imports: [AuthModule, HttpModule],
   controllers: [ThirdPartyController],
   providers: [
+    UsageService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

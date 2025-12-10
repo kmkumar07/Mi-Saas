@@ -5,40 +5,26 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
 import {
   REQUIRED_FEATURE_KEY,
   REQUIRED_PERMISSION_KEY,
   PermissionAction,
 } from './permissions.decorator';
-
-interface UserProductPermissionsResponseDto {
-  tenantId: string;
-  userId: string;
-  products: {
-    productId: string;
-    productName: string;
-    features: {
-      featureId: string;
-      featureName: string;
-      featureCode: string;
-      featureDescription?: string;
-      featureType: string;
-      canRead: boolean;
-      canWrite: boolean;
-      canExecute: boolean;
-    }[];
-  }[];
-}
+import {
+  PermissionCheckerService,
+  PermissionDecision,
+} from './permission-checker.service';
+import {
+  UsageEntitlementsService,
+  UsageDecision,
+} from './usage-entitlements.service';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
+    private readonly permissionChecker: PermissionCheckerService,
+    private readonly usageEntitlements: UsageEntitlementsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -68,73 +54,30 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Missing access token for permission check');
     }
 
-    const uamBaseUrl = this.configService.get<string>('UAM_BASE_URL');
-    const productId = this.configService.get<string>('PRODUCT_ID');
-    if (!productId) {
-      throw new ForbiddenException('PRODUCT_ID is not configured');
-    }
-    const uamPermissionPath =
-      this.configService.get<string>('UAM_PERMISSION_CHECK_PATH') ??
-      '/api/internal/permissions/user-product-matrix';
-
-    if (!uamBaseUrl) {
-      throw new ForbiddenException('UAM_BASE_URL is not configured');
-    }
-
-    const url = `${uamBaseUrl}${uamPermissionPath}`;
-
     try {
-      const response = await firstValueFrom(
-        this.httpService.get(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'x-product-id': productId,  
-          },
-        }),
-      );
-
-      const matrix = response.data as UserProductPermissionsResponseDto;
-
-      // Flatten all features across products and find the one matching featureKey.
-      const allFeatures = matrix.products.flatMap((p) => p.features ?? []);
-      const targetFeature = allFeatures.find(
-        (f) => f.featureCode === featureKey,
-      );
-
-      // Decide allowed based on requested permission action (read/write/execute).
-      let allowed = false;
-      if (targetFeature) {
-        switch (permissionAction) {
-          case 'read':
-            allowed = !!targetFeature.canRead;
-            break;
-          case 'write':
-            allowed = !!targetFeature.canWrite;
-            break;
-          case 'execute':
-            allowed = !!targetFeature.canExecute;
-            break;
-          default:
-            // If no specific action is requested, allow if any permission flag is true.
-            allowed =
-              targetFeature.canRead ||
-              targetFeature.canWrite ||
-              targetFeature.canExecute;
-        }
-      }
-
-      if (!allowed) {
-        throw new ForbiddenException(
-          `You do not have permission for feature ${featureKey}`,
+      // 1) Permission check via UAM
+      const permissionDecision: PermissionDecision =
+        await this.permissionChecker.assertHasPermission(
+          token,
+          featureKey,
+          permissionAction,
         );
-      }
+
+      // 2) Usage / entitlement check via SaaS backend
+      const usageDecision: UsageDecision =
+        await this.usageEntitlements.assertWithinUsage(
+          token,
+          permissionDecision.tenantId,
+          featureKey,
+        );
 
       // Attach minimal decision info so controllers can log or return it.
       request.permissionDecision = {
         allowed: true,
         featureKey,
-        featureName: targetFeature?.featureName,
-        permissionAction: permissionAction ?? 'any',
+        featureName: permissionDecision.featureName,
+        permissionAction: permissionDecision.permissionAction,
+        usage: usageDecision,
       };
 
       return true;
@@ -144,7 +87,7 @@ export class PermissionsGuard implements CanActivate {
       }
 
       throw new ForbiddenException(
-        'Permission check with UAM failed. Access denied.',
+        'Permission or entitlement check failed. Access denied.',
       );
     }
   }

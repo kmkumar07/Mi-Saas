@@ -59,6 +59,25 @@ export class ThirdPartyApiService {
         },
       });
   }
+
+  callCreateShop() {
+    this.lastProtectedCall.set({ loading: true, status: null, message: null });
+
+    this.http
+      .post(`${THIRDPARTY_API_BASE_URL}/api/shops`, {}, { responseType: 'text' })
+      .subscribe({
+        next: (message) => {
+          this.lastProtectedCall.set({ loading: false, status: 200, message });
+        },
+        error: (err) => {
+          this.lastProtectedCall.set({
+            loading: false,
+            status: err.status ?? 0,
+            message: err.error ?? String(err.message ?? 'Unknown error'),
+          });
+        },
+      });
+  }
 }
 
 

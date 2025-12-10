@@ -26,19 +26,18 @@ export class BulkAssignPermissionsUseCase {
             throw new NotFoundException(`Role with ID ${roleId} not found`);
         }
 
-        // 2. Get existing permissions to avoid duplicates
-        const existingPermissions = await this.permissionRepository.findByRoleId(roleId);
-        const existingFeatureIds = new Set(existingPermissions.map(p => p.featureId));
+        // 2. For an edit screen, we want the submitted matrix to be the single source of truth.
+        //    Simplest, most predictable behaviour: remove all existing permissions for the role,
+        //    then recreate them from the incoming DTOs.
+        await this.permissionRepository.deleteByRoleId(roleId);
 
-        // 3. Filter out duplicates
-        const newPermissionsData = permissions.filter(p => !existingFeatureIds.has(p.featureId));
-
-        if (newPermissionsData.length === 0) {
-            return PermissionMapper.toResponseDtoArray(existingPermissions);
+        if (!permissions.length) {
+            // No permissions submitted – return empty list.
+            return [];
         }
 
-        // 4. Create new permissions
-        const newPermissions = newPermissionsData.map(dto =>
+        // 3. Create new permissions based on the submitted matrix
+        const newPermissions = permissions.map(dto =>
             RolePermission.create({
                 tenantId: role.tenantId,
                 roleId,
@@ -50,9 +49,6 @@ export class BulkAssignPermissionsUseCase {
         );
 
         const savedPermissions = await this.permissionRepository.bulkCreate(newPermissions);
-
-        // Return all permissions (existing + new)
-        const allPermissions = [...existingPermissions, ...savedPermissions];
-        return PermissionMapper.toResponseDtoArray(allPermissions);
+        return PermissionMapper.toResponseDtoArray(savedPermissions);
     }
 }

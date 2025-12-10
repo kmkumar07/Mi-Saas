@@ -25,6 +25,10 @@ export class ThirdPartyTestPageComponent {
   callProtected() {
     this.api.callFeatureX();
   }
+
+  callCreateShop() {
+    this.api.callCreateShop();
+  }
 }
 
 

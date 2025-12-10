@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+RUN npm install
+
+COPY nest-cli.json tsconfig.json ./
+COPY src ./src
+
+ENV NODE_ENV=development
+
+CMD ["npm", "run", "start:dev"]
+
+

@@ -1,0 +1,111 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ag-saas-postgres
+    restart: unless-stopped
+    env_file:
+      # Define POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, etc. here
+      - ./backend/.env.db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: ag-saas-backend
+    env_file:
+      - ./backend/.env
+    command: npm run start:dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount only the source for hot reload, keep node_modules inside container
+      - ./backend/src:/usr/src/app/src
+    depends_on:
+      - postgres
+
+  uam-backend:
+    build:
+      context: ./uam-backend
+      dockerfile: Dockerfile.dev
+    container_name: ag-saas-uam-backend
+    env_file:
+      - ./uam-backend/.env
+    command: npm run start:dev
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./uam-backend/src:/usr/src/app/src
+    depends_on:
+      - postgres
+
+  thirdparty-backend:
+    build:
+      context: ./thirdparty-backend
+      dockerfile: Dockerfile.dev
+    container_name: ag-saas-thirdparty-backend
+    env_file:
+      - ./thirdparty-backend/.env
+    command: npm run start:dev
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./thirdparty-backend/src:/usr/src/app/src
+    depends_on:
+      - uam-backend
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: ag-saas-frontend
+    env_file:
+      - ./frontend/.env
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/usr/src/app/src
+    depends_on:
+      - backend
+      - uam-backend
+
+  uam-frontend:
+    build:
+      context: ./uam-frontend
+      dockerfile: Dockerfile.dev
+    container_name: ag-saas-uam-frontend
+    env_file:
+      - ./uam-frontend/.env
+    command: npm run start -- --host 0.0.0.0 --port 4200
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./uam-frontend/src:/usr/src/app/src
+    depends_on:
+      - uam-backend
+
+  thirdparty-frontend:
+    build:
+      context: ./thirdparty-frontend
+      dockerfile: Dockerfile.dev
+    container_name: ag-saas-thirdparty-frontend
+    env_file:
+      - ./thirdparty-frontend/.env
+    command: npm run start -- --host 0.0.0.0 --port 4300
+    ports:
+      - "4300:4300"
+    volumes:
+      - ./thirdparty-frontend/src:/usr/src/app/src
+    depends_on:
+      - thirdparty-backend
+
+volumes:
+  pgdata:
+
+

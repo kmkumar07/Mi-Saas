@@ -72,7 +72,7 @@ export class RolesService {
       canExecute: row.canExecute,
     }));
 
-    return this.http.post(`${API_BASE_URL}/api/roles/${roleId}/permissions/bulk`, {
+    return this.http.put(`${API_BASE_URL}/api/roles/${roleId}/permissions/bulk`, {
       permissions,
     });
   }

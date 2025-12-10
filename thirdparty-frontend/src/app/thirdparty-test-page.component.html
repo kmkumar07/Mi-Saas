@@ -35,7 +35,15 @@
       </p>
 
       <button class="btn btn-primary" (click)="callProtected()" [disabled]="isProtectedLoading()">
-        {{ isProtectedLoading() ? 'Calling…' : 'Call /api/feature-x' }}
+        {{ isProtectedLoading() ? 'Calling…' : 'Call /api/indoor_billing' }}
+      </button>
+
+      <button
+        class="btn btn-primary btn--secondary"
+        (click)="callCreateShop()"
+        [disabled]="isProtectedLoading()"
+      >
+        {{ isProtectedLoading() ? 'Calling…' : 'Call POST /api/shops (create shop)' }}
       </button>
 
       <div class="card__hint">

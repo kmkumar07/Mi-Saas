@@ -61,10 +61,10 @@ export class PermissionsController {
         await this.revokePermissionUseCase.execute(permissionId);
     }
 
-    @Post('roles/:roleId/permissions/bulk')
-    @HttpCode(HttpStatus.CREATED)
-    @ApiOperation({ summary: 'Bulk assign permissions to a role' })
-    @ApiResponse({ status: 201, description: 'Permissions assigned successfully', type: [PermissionResponseDto] })
+    @Put('roles/:roleId/permissions/bulk')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Bulk assign or update permissions for a role' })
+    @ApiResponse({ status: 200, description: 'Permissions updated successfully', type: [PermissionResponseDto] })
     async bulkAssignPermissions(
         @Param('roleId') roleId: string,
         @Body() dto: BulkAssignPermissionsDto,
