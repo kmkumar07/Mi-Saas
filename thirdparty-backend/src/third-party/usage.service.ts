@@ -16,7 +16,7 @@ export class UsageService {
   constructor(
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Decode a JWT without verifying the signature (sufficient for internal test app).
@@ -64,7 +64,7 @@ export class UsageService {
 
     const payload: RecordUsagePayload = {
       tenantId,
-    //   customerId,
+      //   customerId,
       featureCode,
       usage,
       idempotencyKey,
@@ -73,7 +73,7 @@ export class UsageService {
     const url = `${saasBaseUrl}${usagePath}`;
 
     try {
-      await firstValueFrom(
+      const response = await firstValueFrom(
         this.http.post(url, payload, {
           headers: {
             // Mirror the sample curl
@@ -84,7 +84,26 @@ export class UsageService {
           },
         }),
       );
-    } catch (error) {
+
+      const data = response.data;
+      if (data && data.limitExceeded) {
+        throw new ForbiddenException(
+          `Usage limit exceeded for feature ${data.featureCode}. Used: ${data.totalUsed}, Limit: ${data.limit}, Remaining: ${data.remaining}`,
+        );
+      }
+    } catch (error: any) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+
+      // Handle axios errors where response data might contain the limit info
+      if (error.response?.data?.limitExceeded) {
+        const data = error.response.data;
+        throw new ForbiddenException(
+          `Usage limit exceeded for feature ${data.featureCode}. Used: ${data.totalUsed}, Limit: ${data.limit}, Remaining: ${data.remaining}`,
+        );
+      }
+
       console.error('Failed to record usage for feature:', error);
       throw new ForbiddenException(
         'Failed to record usage for feature.',

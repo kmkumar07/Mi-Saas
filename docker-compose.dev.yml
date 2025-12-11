@@ -15,22 +15,21 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/18/docker
 
-  backend:
+  ss-backend:
     build:
-      context: ./backend
+      context: ./ss-backend
       dockerfile: Dockerfile.dev
     container_name: ag-saas-backend
     env_file:
-      - ./backend/.env
+      - ./ss-backend/.env
     environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    command: npm run start:dev
+      NODE_OPTIONS: ""
+    command: node_modules/.bin/nest start --debug 0.0.0.0:9229 --watch
     ports:
       - "3000:3000"
       - "9229:9229"
     volumes:
-      # Mount only the source for hot reload, keep node_modules inside container
-      - ./backend/src:/usr/src/app/src
+      - ./ss-backend/src:/usr/src/app/src
     depends_on:
       - postgres
 
@@ -42,11 +41,11 @@ services:
     env_file:
       - ./uam-backend/.env
     environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    command: npm run start:dev
+      NODE_OPTIONS: ""
+    command: node_modules/.bin/nest start --debug 0.0.0.0:9230 --watch
     ports:
       - "3001:3001"
-      - "9230:9229"
+      - "9230:9230"
     volumes:
       - ./uam-backend/src:/usr/src/app/src
     depends_on:
@@ -60,30 +59,30 @@ services:
     env_file:
       - ./thirdparty-backend/.env
     environment:
-      - NODE_OPTIONS=--inspect=0.0.0.0:9229
-    command: npm run start:dev
+      NODE_OPTIONS: ""
+    command: node_modules/.bin/nest start --debug 0.0.0.0:9231 --watch
     ports:
       - "5003:5003"
-      - "9231:9229"
+      - "9231:9231"
     volumes:
       - ./thirdparty-backend/src:/usr/src/app/src
     depends_on:
       - uam-backend
 
-  frontend:
+  ss-frontend:
     build:
-      context: ./frontend
+      context: ./ss-frontend
       dockerfile: Dockerfile.dev
     container_name: ag-saas-frontend
     env_file:
-      - ./frontend/.env
+      - ./ss-frontend/.env
     command: npm run dev -- --host 0.0.0.0 --port 5173
     ports:
       - "5173:5173"
     volumes:
-      - ./frontend/src:/usr/src/app/src
+      - ./ss-frontend/src:/usr/src/app/src
     depends_on:
-      - backend
+      - ss-backend
       - uam-backend
 
   uam-frontend:
