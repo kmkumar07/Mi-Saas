@@ -39,6 +39,7 @@ import { PlanFamiliesController } from '@presentation/controllers/plan-families.
     exports: [
         PLAN_FAMILY_REPOSITORY,
         PLAN_REPOSITORY,
+        FEATURE_REPOSITORY,
     ],
     providers: [
         // Repositories

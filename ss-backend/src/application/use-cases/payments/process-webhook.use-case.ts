@@ -7,6 +7,7 @@ import { IPaymentGateway, PAYMENT_GATEWAY } from '@domain/services/payment-gatew
 import { WebhookEvent } from '@domain/entities/webhook-event.entity';
 import { Payment } from '@domain/entities/payment.entity';
 import { WebhookEventDto } from '@application/dtos/webhook-event.dto';
+import { ActivateTenantPlanUseCase } from '@application/use-cases/tenant-activation/activate-tenant-plan.use-case';
 
 @Injectable()
 export class ProcessWebhookUseCase {
@@ -21,6 +22,7 @@ export class ProcessWebhookUseCase {
         private readonly subscriptionRepository: ISubscriptionRepository,
         @Inject(PAYMENT_GATEWAY)
         private readonly paymentGateway: IPaymentGateway,
+        private readonly activateTenantPlanUseCase: ActivateTenantPlanUseCase,
     ) { }
 
     async execute(payload: WebhookEventDto, signature: string, rawBody?: string): Promise<void> {
@@ -130,11 +132,26 @@ export class ProcessWebhookUseCase {
         }
 
         // Activate subscription
+        let subscription = null;
         if (paymentOrder.subscriptionId) {
-            const subscription = await this.subscriptionRepository.findById(paymentOrder.subscriptionId);
+            subscription = await this.subscriptionRepository.findById(paymentOrder.subscriptionId);
             if (subscription && subscription.status === 'incomplete') {
                 subscription.activate();
                 await this.subscriptionRepository.update(subscription);
+            }
+        }
+
+        // Automatically trigger tenant activation after successful payment
+        if (subscription && subscription.status === 'active' && subscription.tenantId) {
+            try {
+                await this.activateTenantPlanUseCase.execute({
+                    tenantId: subscription.tenantId,
+                    subscriptionId: subscription.id,
+                });
+            } catch (error: any) {
+                // Log error but don't fail the webhook processing
+                // Activation can be retried later if needed
+                console.error('[WEBHOOK] Failed to activate tenant plan:', error.message);
             }
         }
 

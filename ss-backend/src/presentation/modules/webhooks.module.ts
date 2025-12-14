@@ -11,8 +11,10 @@ import { PAYMENT_ORDER_REPOSITORY } from '@domain/repositories/payment-order.rep
 import { PAYMENT_REPOSITORY } from '@domain/repositories/payment.repository';
 import { SUBSCRIPTION_REPOSITORY } from '@domain/repositories/subscription.repository';
 import { PAYMENT_GATEWAY } from '@domain/services/payment-gateway.interface';
+import { TenantActivationModule } from './tenant-activation.module';
 
 @Module({
+    imports: [TenantActivationModule],
     controllers: [WebhooksController],
     providers: [
         ProcessWebhookUseCase,

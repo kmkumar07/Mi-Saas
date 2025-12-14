@@ -6,6 +6,7 @@ import { IPaymentGateway, PAYMENT_GATEWAY } from '@domain/services/payment-gatew
 import { Payment } from '@domain/entities/payment.entity';
 import { VerifyPaymentDto } from '@application/dtos/verify-payment.dto';
 import { SubscriptionResponseDto } from '@application/dtos/subscription-response.dto';
+import { ActivateTenantPlanUseCase } from '@application/use-cases/tenant-activation/activate-tenant-plan.use-case';
 
 @Injectable()
 export class VerifyPaymentUseCase {
@@ -18,6 +19,7 @@ export class VerifyPaymentUseCase {
         private readonly subscriptionRepository: ISubscriptionRepository,
         @Inject(PAYMENT_GATEWAY)
         private readonly paymentGateway: IPaymentGateway,
+        private readonly activateTenantPlanUseCase: ActivateTenantPlanUseCase,
     ) { }
 
     async execute(dto: VerifyPaymentDto): Promise<{ status: string; subscription?: SubscriptionResponseDto }> {
@@ -84,8 +86,9 @@ export class VerifyPaymentUseCase {
                 }
 
                 // Activate subscription if payment is completed
+                let subscription = null;
                 if (paymentOrder.subscriptionId) {
-                    const subscription = await this.subscriptionRepository.findById(paymentOrder.subscriptionId);
+                    subscription = await this.subscriptionRepository.findById(paymentOrder.subscriptionId);
                     if (subscription && subscription.status === 'incomplete') {
                         subscription.activate();
                         await this.subscriptionRepository.update(subscription);
@@ -98,9 +101,19 @@ export class VerifyPaymentUseCase {
                     await this.paymentOrderRepository.update(paymentOrder);
                 }
 
-                const subscription = paymentOrder.subscriptionId
-                    ? await this.subscriptionRepository.findById(paymentOrder.subscriptionId)
-                    : null;
+                // Automatically trigger tenant activation after successful payment
+                if (subscription && subscription.status === 'active' && subscription.tenantId) {
+                    try {
+                        await this.activateTenantPlanUseCase.execute({
+                            tenantId: subscription.tenantId,
+                            subscriptionId: subscription.id,
+                        });
+                    } catch (error: any) {
+                        // Log error but don't fail the payment verification
+                        // Activation can be retried later if needed
+                        console.error('[VERIFY PAYMENT] Failed to activate tenant plan:', error.message);
+                    }
+                }
 
                 return {
                     status: 'completed',

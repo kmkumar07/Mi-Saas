@@ -8,6 +8,7 @@ import { SubscriptionsModule } from './presentation/modules/subscriptions.module
 import { PaymentsModule } from './presentation/modules/payments.module';
 import { WebhooksModule } from './presentation/modules/webhooks.module';
 import { InternalIntegrationModule } from './internal-integration/internal-integration.module';
+import { TenantActivationModule } from './presentation/modules/tenant-activation.module';
 
 @Module({
     imports: [
@@ -23,6 +24,7 @@ import { InternalIntegrationModule } from './internal-integration/internal-integ
         PaymentsModule,
         WebhooksModule,
         InternalIntegrationModule, // Internal APIs for inter-service communication
+        TenantActivationModule,
     ],
 })
 export class AppModule { }

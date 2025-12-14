@@ -14,8 +14,10 @@ import { SUBSCRIPTION_REPOSITORY } from '@domain/repositories/subscription.repos
 import { PLAN_REPOSITORY } from '@domain/repositories/plan.repository.interface';
 import { ACCOUNT_REPOSITORY } from '@domain/repositories/account.repository';
 import { PAYMENT_GATEWAY } from '@domain/services/payment-gateway.interface';
+import { TenantActivationModule } from './tenant-activation.module';
 
 @Module({
+    imports: [TenantActivationModule],
     controllers: [PaymentsController],
     providers: [
         CreatePaymentOrderUseCase,
