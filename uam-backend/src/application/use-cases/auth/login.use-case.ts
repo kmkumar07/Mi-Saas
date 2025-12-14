@@ -1,55 +1,39 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
-import { IUserRepository } from '../../../domain/repositories/user.repository.interface';
-import { Password } from '../../../domain/value-objects/password.value-object';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { TokenResponseDto } from '../../dtos/auth/token-response.dto';
 import { JwtService } from '@nestjs/jwt';
+import { ResolveIdentityUseCase } from './resolve-identity.use-case';
 
 /**
  * Login Use Case
  * Handles user authentication and token generation
+ * 
+ * UPDATED: Now uses new authentication resolution flow:
+ * auth_account → identity → organization_members → JWT with organizationMemberId
+ * 
+ * CRITICAL: JWT sub claim is now organization_members.id (tenant-scoped), not user.id
  */
 @Injectable()
 export class LoginUseCase {
     constructor(
-        @Inject('IUserRepository')
-        private readonly userRepository: IUserRepository,
+        private readonly resolveIdentityUseCase: ResolveIdentityUseCase,
         private readonly jwtService: JwtService,
     ) { }
 
-    async execute(email: string, password: string): Promise<TokenResponseDto> {
-        // Find user by email and tenant
-        const user = await this.userRepository.findByEmail(email);
+    async execute(email: string, password: string, tenantId: string): Promise<TokenResponseDto> {
+        // Resolve authentication: auth_account → identity → organization_members
+        const resolved = await this.resolveIdentityUseCase.execute(email, password, tenantId);
 
-        if (!user) {
-            throw new UnauthorizedException('Invalid credentials');
-        }
-
-        // Verify password
-        const passwordObj = Password.fromHash(user.passwordHash);
-        const isValid = await passwordObj.compare(password);
-
-        if (!isValid) {
-            throw new UnauthorizedException('Invalid credentials');
-        }
-
-        // Check if user is active
-        if (!user.isActive) {
-            throw new UnauthorizedException('Account is inactive');
-        }
-
-        // Generate tokens
+        // Generate tokens with organizationMemberId as sub claim
+        // This is tenant-scoped and represents the membership, not the global identity
         const payload = {
-            sub: user.id,
-            email: user.email,
-            tenantId: user.tenantId
+            sub: resolved.organizationMemberId, // JWT sub = organization_members.id
+            identityId: resolved.identityId, // Include identityId for reference
+            email: resolved.email,
+            tenantId: resolved.tenantId,
         };
 
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
         const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
-
-        // Update last login
-        user.recordLogin();
-        await this.userRepository.update(user);
 
         return new TokenResponseDto(accessToken, refreshToken, 900); // 15 minutes
     }

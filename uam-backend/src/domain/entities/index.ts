@@ -1,6 +1,11 @@
+export { Identity, IdentityProps } from './identity.entity';
+export { AuthenticationAccount, AuthenticationAccountProps, AuthenticationProvider } from './authentication-account.entity';
+export { OrganizationMember, OrganizationMemberProps } from './organization-member.entity';
+export { OrganizationAdmin, OrganizationAdminProps } from './organization-admin.entity';
+export { ProductAccessGrant, ProductAccessGrantProps } from './product-access-grant.entity';
 export { User, UserProps } from './user.entity';
 export { SystemRole, SystemRoleProps } from './system-role.entity';
-export { UserRole, UserRoleProps } from './user-role.entity';
+export { MemberRole, MemberRoleProps } from './user-role.entity';
 export { EmployeeInvitation, EmployeeInvitationProps } from './employee-invitation.entity';
 export { RolePermission, RolePermissionProps } from './role-permission.entity';
 export { OAuthToken, OAuthTokenProps } from './oauth-token.entity';

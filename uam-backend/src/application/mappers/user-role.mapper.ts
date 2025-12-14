@@ -1,23 +1,24 @@
-import { UserRole } from '../../domain/entities/user-role.entity';
+import { MemberRole } from '../../domain/entities/user-role.entity';
 import { UserRoleResponseDto } from '../dtos/users/user-role-response.dto';
 
 /**
- * User Role Mapper
- * Maps UserRole entity to UserRoleResponseDto
+ * Member Role Mapper
+ * Maps MemberRole entity to UserRoleResponseDto
+ * RENAMED from UserRoleMapper to reflect new permission model
  */
 export class UserRoleMapper {
-    static toResponseDto(userRole: UserRole): UserRoleResponseDto {
+    static toResponseDto(memberRole: MemberRole): UserRoleResponseDto {
         const dto = new UserRoleResponseDto();
-        dto.id = userRole.id;
-        dto.userId = userRole.userId;
-        dto.roleId = userRole.roleId;
-        dto.productId = userRole.productId ?? null;
-        dto.assignedBy = userRole.assignedBy;
-        dto.assignedAt = userRole.assignedAt;
+        dto.id = memberRole.id;
+        dto.userId = memberRole.organizationMemberId; // Keep userId field for backward compatibility
+        dto.roleId = memberRole.roleId;
+        dto.productId = memberRole.productId ?? null;
+        dto.assignedBy = memberRole.assignedBy;
+        dto.assignedAt = memberRole.assignedAt;
         return dto;
     }
 
-    static toResponseDtoArray(userRoles: UserRole[]): UserRoleResponseDto[] {
-        return userRoles.map(ur => this.toResponseDto(ur));
+    static toResponseDtoArray(memberRoles: MemberRole[]): UserRoleResponseDto[] {
+        return memberRoles.map(mr => this.toResponseDto(mr));
     }
 }

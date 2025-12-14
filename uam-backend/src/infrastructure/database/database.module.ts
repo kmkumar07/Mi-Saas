@@ -1,8 +1,13 @@
 import { Module, Global } from '@nestjs/common';
 import { databaseProviders } from './database.provider';
+import { IdentityRepository } from './repositories/identity.repository';
+import { AuthenticationAccountRepository } from './repositories/authentication-account.repository';
+import { OrganizationMemberRepository } from './repositories/organization-member.repository';
+import { OrganizationAdminRepository } from './repositories/organization-admin.repository';
+import { ProductAccessGrantRepository } from './repositories/product-access-grant.repository';
 import { UserRepository } from './repositories/user.repository';
 import { SystemRoleRepository } from './repositories/system-role.repository';
-import { UserRoleRepository } from './repositories/user-role.repository';
+import { MemberRoleRepository } from './repositories/user-role.repository';
 import { EmployeeInvitationRepository } from './repositories/employee-invitation.repository';
 import { RolePermissionRepository } from './repositories/role-permission.repository';
 import { OAuthTokenRepository } from './repositories/oauth-token.repository';
@@ -18,6 +23,26 @@ import { AuditLogRepository } from './repositories/audit-log.repository';
     providers: [
         ...databaseProviders,
         {
+            provide: 'IIdentityRepository',
+            useClass: IdentityRepository,
+        },
+        {
+            provide: 'IAuthenticationAccountRepository',
+            useClass: AuthenticationAccountRepository,
+        },
+        {
+            provide: 'IOrganizationMemberRepository',
+            useClass: OrganizationMemberRepository,
+        },
+        {
+            provide: 'IOrganizationAdminRepository',
+            useClass: OrganizationAdminRepository,
+        },
+        {
+            provide: 'IProductAccessGrantRepository',
+            useClass: ProductAccessGrantRepository,
+        },
+        {
             provide: 'IUserRepository',
             useClass: UserRepository,
         },
@@ -26,8 +51,8 @@ import { AuditLogRepository } from './repositories/audit-log.repository';
             useClass: SystemRoleRepository,
         },
         {
-            provide: 'IUserRoleRepository',
-            useClass: UserRoleRepository,
+            provide: 'IMemberRoleRepository',
+            useClass: MemberRoleRepository,
         },
         {
             provide: 'IEmployeeInvitationRepository',
@@ -48,9 +73,14 @@ import { AuditLogRepository } from './repositories/audit-log.repository';
     ],
     exports: [
         ...databaseProviders,
+        'IIdentityRepository',
+        'IAuthenticationAccountRepository',
+        'IOrganizationMemberRepository',
+        'IOrganizationAdminRepository',
+        'IProductAccessGrantRepository',
         'IUserRepository',
         'ISystemRoleRepository',
-        'IUserRoleRepository',
+        'IMemberRoleRepository',
         'IEmployeeInvitationRepository',
         'IRolePermissionRepository',
         'IOAuthTokenRepository',

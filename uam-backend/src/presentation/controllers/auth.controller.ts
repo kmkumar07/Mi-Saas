@@ -83,9 +83,12 @@ export class AuthController {
         @Body() loginDto: LoginDto,
         @Res({ passthrough: true }) res: Response,
     ): Promise<TokenResponseDto> {
+        // UPDATED: Login now requires tenantId for organization membership resolution
+        // Authentication flow: auth_account → identity → organization_members → JWT with organizationMemberId
         const tokens = await this.loginUseCase.execute(
             loginDto.email,
             loginDto.password,
+            loginDto.tenantId,
         );
 
         this.setAuthCookie(res, tokens.accessToken);
@@ -150,12 +153,16 @@ export class AuthController {
             throw new UnauthorizedException('Invalid token');
         }
 
-        const userId = payload.sub as string | undefined;
-        if (!userId) {
-            throw new UnauthorizedException('Invalid token payload');
+        // UPDATED: JWT sub is now organization_members.id (tenant-scoped), not user.id
+        const organizationMemberId = payload?.sub as string | undefined;
+        if (!organizationMemberId) {
+            throw new UnauthorizedException('Invalid token payload - missing organization member ID');
         }
 
-        const user = await this.userRepository.findById(userId);
+        // TODO: Update this to use organization member repository instead of user repository
+        // For now, keeping user repository for backward compatibility during migration
+        // In the new model, we should return organization member info, not user info
+        const user = await this.userRepository.findById(organizationMemberId);
         if (!user) {
             throw new UnauthorizedException('User not found');
         }

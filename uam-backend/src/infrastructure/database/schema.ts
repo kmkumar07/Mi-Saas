@@ -14,6 +14,13 @@ export const accountTypeEnum = uamSchema.enum('account_type', ['individual', 'co
 
 export const authProviderEnum = uamSchema.enum('auth_provider', ['local', 'azure_ad']);
 
+export const authenticationProviderEnum = uamSchema.enum('authentication_provider', [
+    'local',
+    'azure_ad',
+    'google',
+    'cognito',
+]);
+
 export const invitationStatusEnum = uamSchema.enum('invitation_status', [
     'pending',
     'accepted',
@@ -24,6 +31,131 @@ export const invitationStatusEnum = uamSchema.enum('invitation_status', [
 // ============================
 // UAM SCHEMA TABLES
 // ============================
+
+/**
+ * Identities Table
+ * Global human identity - represents a person across all tenants
+ * This is the foundation of the identity layer in the permission model
+ */
+export const identities = uamSchema.table(
+    'identities',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        email: varchar('email', { length: 255 }).notNull().unique(),
+        firstName: varchar('first_name', { length: 100 }),
+        lastName: varchar('last_name', { length: 100 }),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        emailIdx: index('idx_identities_email').on(table.email),
+    })
+);
+
+/**
+ * Authentication Accounts Table
+ * Login methods per identity - supports multiple auth providers per identity
+ * This separates authentication from identity, allowing one person to have multiple login methods
+ */
+export const authenticationAccounts = uamSchema.table(
+    'authentication_accounts',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        identityId: uuid('identity_id').notNull().references(() => identities.id, { onDelete: 'cascade' }),
+        provider: authenticationProviderEnum('provider').notNull(),
+        providerAccountId: varchar('provider_account_id', { length: 255 }), // External provider ID
+        email: varchar('email', { length: 255 }).notNull(), // May differ from identity.email
+        passwordHash: varchar('password_hash', { length: 255 }), // Only for local provider
+        externalId: varchar('external_id', { length: 255 }), // Azure AD Object ID, etc.
+        isActive: boolean('is_active').default(true).notNull(),
+        isEmailVerified: boolean('is_email_verified').default(false).notNull(),
+        lastLoginAt: timestamp('last_login_at'),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        uniqueIdentityProvider: unique().on(table.identityId, table.provider, table.providerAccountId),
+        identityIdx: index('idx_auth_accounts_identity').on(table.identityId),
+        emailIdx: index('idx_auth_accounts_email').on(table.email),
+        providerIdx: index('idx_auth_accounts_provider').on(table.provider),
+    })
+);
+
+/**
+ * Organization Members Table
+ * Baseline membership - identity ↔ tenant relationship
+ * This is the REQUIRED layer for all access. No actor can access tenant resources without being a member.
+ * The JWT sub claim will be organization_members.id (tenant-scoped)
+ */
+export const organizationMembers = uamSchema.table(
+    'organization_members',
+    {
+        id: uuid('id').primaryKey().defaultRandom(), // This becomes the JWT sub claim
+        identityId: uuid('identity_id').notNull().references(() => identities.id, { onDelete: 'cascade' }),
+        tenantId: uuid('tenant_id').notNull(), // FK to subscription.tenants (cross-schema)
+        isActive: boolean('is_active').default(true).notNull(),
+        joinedAt: timestamp('joined_at').defaultNow().notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        uniqueIdentityTenant: unique().on(table.identityId, table.tenantId),
+        identityIdx: index('idx_org_members_identity').on(table.identityId),
+        tenantIdx: index('idx_org_members_tenant').on(table.tenantId),
+    })
+);
+
+/**
+ * Organization Admins Table
+ * Tenant-level administrative authority - grants full administrative control over a tenant
+ * This is an ADDITIVE layer on top of organization_members. Admins MUST also be members.
+ * Admin status grants tenant governance (billing, member management, IdP config) but does NOT bypass RBAC.
+ */
+export const organizationAdmins = uamSchema.table(
+    'organization_admins',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        organizationMemberId: uuid('organization_member_id')
+            .notNull()
+            .references(() => organizationMembers.id, { onDelete: 'cascade' })
+            .unique(), // One admin record per member
+        tenantId: uuid('tenant_id').notNull(), // Denormalized for efficient queries
+        grantedBy: uuid('granted_by').references(() => organizationMembers.id, { onDelete: 'set null' }),
+        grantedAt: timestamp('granted_at').defaultNow().notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        tenantIdx: index('idx_org_admins_tenant').on(table.tenantId),
+        memberIdx: index('idx_org_admins_member').on(table.organizationMemberId),
+    })
+);
+
+/**
+ * Product Access Grants Table
+ * Product-level access control - determines which products an identity can access within a tenant
+ * This is an ADDITIVE layer that grants scope control. Product access is checked before RBAC.
+ * Product owners MUST also be organization_members.
+ */
+export const productAccessGrants = uamSchema.table(
+    'product_access_grants',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        organizationMemberId: uuid('organization_member_id')
+            .notNull()
+            .references(() => organizationMembers.id, { onDelete: 'cascade' }),
+        productId: uuid('product_id').notNull(), // FK to subscription.products (cross-schema)
+        tenantId: uuid('tenant_id').notNull(), // Denormalized for efficient queries
+        grantedBy: uuid('granted_by').references(() => organizationMembers.id, { onDelete: 'set null' }),
+        grantedAt: timestamp('granted_at').defaultNow().notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        uniqueMemberProduct: unique().on(table.organizationMemberId, table.productId),
+        memberIdx: index('idx_product_access_member').on(table.organizationMemberId),
+        productIdx: index('idx_product_access_product').on(table.productId),
+        tenantIdx: index('idx_product_access_tenant').on(table.tenantId),
+    })
+);
 
 /**
  * Service User Involvement Roles Table
@@ -100,47 +232,29 @@ export const users = uamSchema.table(
 );
 
 /**
- * User Roles Table
- * Junction table linking users to roles
+ * Member Roles Table
+ * Junction table linking organization_members to roles
+ * RENAMED from user_roles to reflect new permission model
+ * RBAC subject is always organization_members.id, never identity.id
  */
-export const userRoles = uamSchema.table(
-    'user_roles',
+export const memberRoles = uamSchema.table(
+    'member_roles',
     {
         id: uuid('id').primaryKey().defaultRandom(),
-        userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+        organizationMemberId: uuid('organization_member_id')
+            .notNull()
+            .references(() => organizationMembers.id, { onDelete: 'cascade' }),
         roleId: uuid('role_id').notNull().references(() => systemRoles.id, { onDelete: 'cascade' }),
-        // Optional product scope for the user-role assignment
+        // Optional product scope for the member-role assignment
         productId: uuid('product_id'),
-        assignedBy: uuid('assigned_by').references(() => users.id),
+        assignedBy: uuid('assigned_by').references(() => organizationMembers.id, { onDelete: 'set null' }),
         assignedAt: timestamp('assigned_at').defaultNow().notNull(),
     },
     (table) => ({
-        uniqueUserRole: unique().on(table.userId, table.roleId),
-        userIdx: index('idx_user_roles_user').on(table.userId),
-        roleIdx: index('idx_user_roles_role').on(table.roleId),
-        productIdx: index('idx_user_roles_product').on(table.productId),
-    })
-);
-
-/**
- * Product Involvement Roles Table
- * Links products to roles (cross-schema reference to subscription products)
- */
-export const productInvlovemnetRoles = uamSchema.table(
-    'product_invlovemnet_roles',
-    {
-        id: uuid('id').primaryKey().defaultRandom(),
-        tenantId: uuid('tenant_id'), // NULL for global mappings
-        productId: uuid('product_id').notNull(), // FK to subscription.products (cross-schema)
-        roleId: uuid('role_id').notNull().references(() => systemRoles.id, { onDelete: 'cascade' }),
-        createdAt: timestamp('created_at').defaultNow().notNull(),
-        updatedAt: timestamp('updated_at').defaultNow().notNull(),
-    },
-    (table) => ({
-        uniqueTenantProductRole: unique().on(table.tenantId, table.productId, table.roleId),
-        tenantIdx: index('idx_product_invlovemnet_roles_tenant').on(table.tenantId),
-        productIdx: index('idx_product_invlovemnet_roles_product').on(table.productId),
-        roleIdx: index('idx_product_invlovemnet_roles_role').on(table.roleId),
+        uniqueMemberRole: unique().on(table.organizationMemberId, table.roleId),
+        memberIdx: index('idx_member_roles_member').on(table.organizationMemberId),
+        roleIdx: index('idx_member_roles_role').on(table.roleId),
+        productIdx: index('idx_member_roles_product').on(table.productId),
     })
 );
 
@@ -179,7 +293,7 @@ export const employeeInvitations = uamSchema.table(
         id: uuid('id').primaryKey().defaultRandom(),
         tenantId: uuid('tenant_id').notNull(), // FK to subscription.tenants
         email: varchar('email', { length: 255 }).notNull(),
-        invitedBy: uuid('invited_by').references(() => users.id),
+        invitedBy: uuid('invited_by').references(() => organizationMembers.id, { onDelete: 'set null' }),
         invitationToken: varchar('invitation_token', { length: 255 }).unique().notNull(),
         roleIds: uuid('role_ids').array().notNull(), // Array of role IDs
         status: invitationStatusEnum('status').default('pending').notNull(),
@@ -203,7 +317,7 @@ export const auditLogs = uamSchema.table(
     'audit_logs',
     {
         id: uuid('id').primaryKey().defaultRandom(),
-        userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+        organizationMemberId: uuid('organization_member_id').references(() => organizationMembers.id, { onDelete: 'set null' }),
         tenantId: uuid('tenant_id').notNull(), // FK to subscription.tenants
         action: varchar('action', { length: 100 }).notNull(), // e.g., 'user.created'
         resourceType: varchar('resource_type', { length: 50 }).notNull(), // e.g., 'user', 'role'
@@ -214,7 +328,7 @@ export const auditLogs = uamSchema.table(
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
     (table) => ({
-        userIdx: index('idx_audit_logs_user').on(table.userId),
+        memberIdx: index('idx_audit_logs_member').on(table.organizationMemberId),
         tenantIdx: index('idx_audit_logs_tenant').on(table.tenantId),
         actionIdx: index('idx_audit_logs_action').on(table.action),
         createdIdx: index('idx_audit_logs_created').on(table.createdAt),
@@ -229,7 +343,7 @@ export const oauthTokens = uamSchema.table(
     'oauth_tokens',
     {
         id: uuid('id').primaryKey().defaultRandom(),
-        userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+        organizationMemberId: uuid('organization_member_id').notNull().references(() => organizationMembers.id, { onDelete: 'cascade' }),
         accessToken: text('access_token').unique().notNull(),
         refreshToken: text('refresh_token').unique(),
         tokenType: varchar('token_type', { length: 20 }).default('Bearer').notNull(),
@@ -240,7 +354,7 @@ export const oauthTokens = uamSchema.table(
         revokedAt: timestamp('revoked_at'),
     },
     (table) => ({
-        userIdx: index('idx_oauth_tokens_user').on(table.userId),
+        memberIdx: index('idx_oauth_tokens_member').on(table.organizationMemberId),
         accessIdx: index('idx_oauth_tokens_access').on(table.accessToken),
         refreshIdx: index('idx_oauth_tokens_refresh').on(table.refreshToken),
     })
@@ -250,14 +364,29 @@ export const oauthTokens = uamSchema.table(
 // TYPE EXPORTS
 // ============================
 
+export type Identity = typeof identities.$inferSelect;
+export type NewIdentity = typeof identities.$inferInsert;
+
+export type AuthenticationAccount = typeof authenticationAccounts.$inferSelect;
+export type NewAuthenticationAccount = typeof authenticationAccounts.$inferInsert;
+
+export type OrganizationMember = typeof organizationMembers.$inferSelect;
+export type NewOrganizationMember = typeof organizationMembers.$inferInsert;
+
+export type OrganizationAdmin = typeof organizationAdmins.$inferSelect;
+export type NewOrganizationAdmin = typeof organizationAdmins.$inferInsert;
+
+export type ProductAccessGrant = typeof productAccessGrants.$inferSelect;
+export type NewProductAccessGrant = typeof productAccessGrants.$inferInsert;
+
 export type SystemRole = typeof systemRoles.$inferSelect;
 export type NewSystemRole = typeof systemRoles.$inferInsert;
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
-export type UserRole = typeof userRoles.$inferSelect;
-export type NewUserRole = typeof userRoles.$inferInsert;
+export type MemberRole = typeof memberRoles.$inferSelect;
+export type NewMemberRole = typeof memberRoles.$inferInsert;
 
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type NewRolePermission = typeof rolePermissions.$inferInsert;

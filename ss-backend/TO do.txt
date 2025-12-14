@@ -132,3 +132,242 @@ UAM
 2.when creating roles and user pass the  prdcut id form the uam frontend . and apply it in user_roles table
 
 3.Prouct owner for UAM application
+
+
+ss service
+1.single plan can have multiple prices:[{
+  renawaldefintion:{}
+  trialPeriod:{}
+  }
+]
+
+2.cross domain
+3.dub domain creation when business register kind of feature
+
+
+
+
+# Layered Permission Model Implementation
+
+## Architecture Overview
+
+The permission model follows a strict hierarchy where every layer builds on the previous:
+
+```
+Identity (global human)
+  └─ Organization Member (baseline, required)
+       ├─ RBAC roles (dynamic, feature-based)
+       ├─ Organization Admin (tenant governance)
+       └─ Product Access (scope control)
+```
+
+**Core Principle**: No layer bypasses Organization Member. All authorization checks must verify membership first.
+
+## Database Schema Changes
+
+### New Tables in UAM Schema
+
+1. **`identities`** - Global human identity
+
+   - `id` (uuid, PK)
+   - `email` (varchar, unique) - normalized email for identity matching
+   - `firstName`, `lastName` (optional profile fields)
+   - `createdAt`, `updatedAt`
+
+2. **`auth_accounts`** - Login methods per identity
+
+   - `id` (uuid, PK)
+   - `identityId` (uuid, FK → identities)
+   - `provider` (enum: 'local', 'azure_ad', 'google', 'cognito')
+   - `providerAccountId` (varchar) - external provider ID
+   - `email` (varchar) - may differ from identity.email for provider-specific emails
+   - `passwordHash` (varchar, nullable) - only for local provider
+   - `externalId` (varchar, nullable) - Azure AD Object ID, etc.
+   - `isActive`, `isEmailVerified`
+   - `lastLoginAt`, `createdAt`, `updatedAt`
+   - Unique constraint: (identityId, provider, providerAccountId)
+
+3. **`organization_members`** - Baseline membership (identity ↔ tenant)
+
+   - `id` (uuid, PK) - **This becomes the JWT `sub` claim**
+   - `identityId` (uuid, FK → identities)
+   - `tenantId` (uuid, FK → subscription.tenants)
+   - `isActive` (boolean)
+   - `joinedAt`, `createdAt`, `updatedAt`
+   - Unique constraint: (identityId, tenantId)
+
+4. **`organization_admins`** - Tenant-level administrative authority
+
+   - `id` (uuid, PK)
+   - `organizationMemberId` (uuid, FK → organization_members, cascade delete)
+   - `tenantId` (uuid, FK → subscription.tenants) - denormalized for queries
+   - `grantedBy` (uuid, FK → organization_members, nullable)
+   - `grantedAt`, `createdAt`
+   - Unique constraint: (organizationMemberId) - one admin record per member
+   - **Note**: Must also exist in organization_members (enforced by FK)
+
+5. **`product_access_permissions`** - Product-level access control
+
+   - `id` (uuid, PK)
+   - `organizationMemberId` (uuid, FK → organization_members, cascade delete)
+   - `productId` (uuid, FK → subscription.products)
+   - `tenantId` (uuid, FK → subscription.tenants) - denormalized for queries
+   - `grantedBy` (uuid, FK → organization_members, nullable)
+   - `grantedAt`, `createdAt`
+   - Unique constraint: (organizationMemberId, productId)
+
+### Schema Modifications
+
+- **Remove from `uam.users`**: `accountType`, `organizationId`, `isCompanyOwner` (billing-only fields)
+- **Keep in `uam.users` temporarily**: For migration reference, then drop after data migration
+- **`ss-backend.accounts.accountType`**: Remains the ONLY source of truth for billing
+
+### RBAC Tables (Unchanged)
+
+- `uam.roles` - System and tenant roles
+- `uam.user_roles` - **Update**: Change `userId` → `organizationMemberId`
+- `uam.role_permissions` - Role-to-feature permissions
+- `uam.product_invlovemnet_roles` - Product-role mappings
+
+## Authorization Flow
+
+### Authentication Resolution
+
+```
+auth_account (login) 
+  → identity (global person)
+    → organization_members (tenant membership)
+      → JWT issued with sub = organization_members.id
+```
+
+### Authorization Check Flow
+
+All resource access must follow this sequence:
+
+1. **Extract JWT `sub`** → `organizationMemberId`
+2. **Verify Organization Membership**:
+   ```typescript
+   const member = await orgMemberRepo.findById(organizationMemberId);
+   if (!member || !member.isActive || member.tenantId !== requestedTenantId) {
+     throw ForbiddenException('Not a member of this organization');
+   }
+   ```
+
+3. **Check Product Access** (if accessing product-scoped resource):
+   ```typescript
+   const hasAccess = await productAccessRepo.exists({
+     organizationMemberId,
+     productId,
+     tenantId
+   });
+   if (!hasAccess) {
+     throw ForbiddenException('No access to this product');
+   }
+   ```
+
+4. **Check Organization Admin** (if performing admin action):
+   ```typescript
+   const isAdmin = await orgAdminRepo.exists({ organizationMemberId, tenantId });
+   // Admin status grants tenant governance, but does NOT bypass RBAC
+   ```
+
+5. **Check RBAC** (always required for feature access):
+   ```typescript
+   // Existing RBAC logic unchanged
+   // RBAC subject = organization_members.id (not identity.id)
+   const hasPermission = await rbacService.checkPermission(
+     organizationMemberId, // subject
+     featureKey,
+     action
+   );
+   ```
+
+
+### Key Authorization Rules
+
+- **Organization Member is mandatory**: No access without active membership
+- **Product Access is additive**: Grants scope, but RBAC still applies
+- **Organization Admin is additive**: Grants tenant governance, but RBAC still applies
+- **RBAC is never bypassed**: Even admins must have RBAC permissions for features
+
+## Implementation Files
+
+### Database Schema
+
+- `uam-backend/src/infrastructure/database/schema.ts` - Add new table definitions
+- `uam-backend/drizzle/migrations/XXXX_new_permission_model.sql` - Migration file
+
+### Domain Layer
+
+- `uam-backend/src/domain/entities/identity.entity.ts` - New
+- `uam-backend/src/domain/entities/auth-account.entity.ts` - New
+- `uam-backend/src/domain/entities/organization-member.entity.ts` - New
+- `uam-backend/src/domain/entities/organization-admin.entity.ts` - New
+- `uam-backend/src/domain/entities/product-access-permission.entity.ts` - New
+- Update `user-role.entity.ts` to reference `organizationMemberId`
+
+### Repository Interfaces
+
+- `uam-backend/src/domain/repositories/identity.repository.interface.ts` - New
+- `uam-backend/src/domain/repositories/auth-account.repository.interface.ts` - New
+- `uam-backend/src/domain/repositories/organization-member.repository.interface.ts` - New
+- `uam-backend/src/domain/repositories/organization-admin.repository.interface.ts` - New
+- `uam-backend/src/domain/repositories/product-access-permission.repository.interface.ts` - New
+- Update `user-role.repository.interface.ts` to use `organizationMemberId`
+
+### Infrastructure Layer
+
+- `uam-backend/src/infrastructure/persistence/identity.repository.ts` - New
+- `uam-backend/src/infrastructure/persistence/auth-account.repository.ts` - New
+- `uam-backend/src/infrastructure/persistence/organization-member.repository.ts` - New
+- `uam-backend/src/infrastructure/persistence/organization-admin.repository.ts` - New
+- `uam-backend/src/infrastructure/persistence/product-access-permission.repository.ts` - New
+
+### Application Layer
+
+- `uam-backend/src/application/use-cases/auth/resolve-identity.use-case.ts` - New: Resolve auth_account → identity → organization_members
+- `uam-backend/src/application/use-cases/auth/login.use-case.ts` - Update to use new flow
+- `uam-backend/src/application/use-cases/authorization/check-membership.use-case.ts` - New
+- `uam-backend/src/application/use-cases/authorization/check-product-access.use-case.ts` - New
+- `uam-backend/src/application/use-cases/authorization/check-org-admin.use-case.ts` - New
+- Update RBAC use cases to accept `organizationMemberId` instead of `userId`
+
+### Presentation Layer
+
+- `uam-backend/src/presentation/guards/organization-member.guard.ts` - New: Enforces membership
+- `uam-backend/src/presentation/guards/product-access.guard.ts` - New: Checks product access
+- `uam-backend/src/presentation/guards/organization-admin.guard.ts` - New: Checks admin status
+- Update existing guards to use new authorization flow
+- `uam-backend/src/presentation/controllers/auth.controller.ts` - Update JWT generation to use `organizationMemberId`
+
+### Authorization Service
+
+- `uam-backend/src/application/services/authorization.service.ts` - New: Centralized authorization orchestration
+  - `checkAccess(organizationMemberId, tenantId, productId?, featureKey?, action?)`
+  - Enforces full hierarchy: membership → product access → admin → RBAC
+
+## Migration Strategy
+
+Since this is a greenfield reset:
+
+1. **Drop existing `uam.users` table** (after extracting any needed reference data)
+2. **Create new tables** in order: identities → auth_accounts → organization_members → organization_admins → product_access_permissions
+3. **Update `user_roles`** table: Rename `userId` column to `organizationMemberId`, update FK
+4. **Update all code references** from `userId` to `organizationMemberId` where appropriate
+
+## Critical Implementation Notes
+
+1. **JWT Structure**: `sub` = `organization_members.id` (tenant-scoped), includes `tenantId` claim
+2. **No Bypass Logic**: Every authorization check starts with membership verification
+3. **Account Type**: Only exists in `ss-backend.accounts.accountType`, never inferred
+4. **RBAC Subject**: Always `organization_members.id`, never `identity.id`
+5. **Cascade Deletes**: Removing organization_member cascades to admins, product access, and user_roles
+6. **Comments**: Add extensive comments explaining why each layer cannot bypass the previous
+
+## Testing Considerations
+
+- Unit tests for each authorization layer
+- Integration tests for full authorization flow
+- Verify admins still require RBAC permissions
+- Verify product access is checked before RBAC
+- Verify membership is always checked first

@@ -40,37 +40,26 @@ export class OAuthTokenRepository implements IOAuthTokenRepository {
         return result.length > 0 ? this.toDomain(result[0]) : null;
     }
 
-    async findByUserId(userId: string): Promise<OAuthToken[]> {
+    async findByOrganizationMemberId(organizationMemberId: string): Promise<OAuthToken[]> {
         const results = await this.db
             .select()
             .from(schema.oauthTokens)
-            .where(eq(schema.oauthTokens.userId, userId));
+            .where(eq(schema.oauthTokens.organizationMemberId, organizationMemberId));
         return results.map(row => this.toDomain(row));
     }
 
+    async findActiveByOrganizationMemberId(organizationMemberId: string): Promise<OAuthToken[]> {
+        // Active means NOT revoked AND NOT expired
+        return this.findByOrganizationMemberId(organizationMemberId).then(tokens => tokens.filter(t => t.isValid()));
+    }
+
+    // Backward compatibility methods
+    async findByUserId(userId: string): Promise<OAuthToken[]> {
+        return this.findByOrganizationMemberId(userId);
+    }
+
     async findActiveByUserId(userId: string): Promise<OAuthToken[]> {
-        const now = new Date();
-        const results = await this.db
-            .select()
-            .from(schema.oauthTokens)
-            .where(
-                and(
-                    eq(schema.oauthTokens.userId, userId),
-                    isNull(schema.oauthTokens.revokedAt),
-                    lt(schema.oauthTokens.expiresAt, now) // Note: This logic seems inverted for "active", usually active means expiresAt > now. But let's check standard logic. Active usually means NOT expired. So expiresAt > now.
-                    // Wait, lt(expiresAt, now) means expiresAt < now, which means expired.
-                    // So for active, we want expiresAt > now. Drizzle has gt? Yes.
-                )
-            );
-
-        // Correcting logic: Active means NOT revoked AND NOT expired.
-        // However, standard OAuth often keeps expired tokens until rotated.
-        // Let's stick to the interface contract. "Active" usually implies valid.
-        // Let's use JS filtering for safety or fix the query.
-        // Using query: expiresAt > now
-
-        // Re-writing query for correctness
-        return this.findByUserId(userId).then(tokens => tokens.filter(t => t.isValid()));
+        return this.findActiveByOrganizationMemberId(userId);
     }
 
     async create(token: OAuthToken): Promise<OAuthToken> {
@@ -98,16 +87,21 @@ export class OAuthTokenRepository implements IOAuthTokenRepository {
             .where(eq(schema.oauthTokens.id, id));
     }
 
-    async revokeByUserId(userId: string): Promise<void> {
+    async revokeByOrganizationMemberId(organizationMemberId: string): Promise<void> {
         await this.db
             .update(schema.oauthTokens)
             .set({ revokedAt: new Date() })
             .where(
                 and(
-                    eq(schema.oauthTokens.userId, userId),
+                    eq(schema.oauthTokens.organizationMemberId, organizationMemberId),
                     isNull(schema.oauthTokens.revokedAt)
                 )
             );
+    }
+
+    // Backward compatibility method
+    async revokeByUserId(userId: string): Promise<void> {
+        return this.revokeByOrganizationMemberId(userId);
     }
 
     async deleteExpiredTokens(): Promise<void> {
@@ -125,7 +119,7 @@ export class OAuthTokenRepository implements IOAuthTokenRepository {
     private toDomain(row: typeof schema.oauthTokens.$inferSelect): OAuthToken {
         return OAuthToken.fromPersistence({
             id: row.id,
-            userId: row.userId,
+            organizationMemberId: row.organizationMemberId,
             accessToken: row.accessToken,
             refreshToken: row.refreshToken,
             tokenType: row.tokenType,

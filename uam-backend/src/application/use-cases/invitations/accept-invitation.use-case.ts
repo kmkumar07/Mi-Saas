@@ -1,10 +1,10 @@
 import { Injectable, Inject, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { IEmployeeInvitationRepository } from '../../../domain/repositories/employee-invitation.repository.interface';
 import { IUserRepository } from '../../../domain/repositories/user.repository.interface';
-import { IUserRoleRepository } from '../../../domain/repositories/user-role.repository.interface';
+import { IMemberRoleRepository } from '../../../domain/repositories/user-role.repository.interface';
 import { EmployeeInvitation } from '../../../domain/entities/employee-invitation.entity';
 import { User } from '../../../domain/entities/user.entity';
-import { UserRole } from '../../../domain/entities/user-role.entity';
+import { MemberRole } from '../../../domain/entities/user-role.entity';
 import { AcceptInvitationDto } from '../../dtos/invitations/accept-invitation.dto';
 import { UserResponseDto } from '../../dtos/users/user-response.dto';
 import { UserMapper } from '../../mappers/user.mapper';
@@ -22,8 +22,8 @@ export class AcceptInvitationUseCase {
         private readonly invitationRepository: IEmployeeInvitationRepository,
         @Inject('IUserRepository')
         private readonly userRepository: IUserRepository,
-        @Inject('IUserRoleRepository')
-        private readonly userRoleRepository: IUserRoleRepository,
+        @Inject('IMemberRoleRepository')
+        private readonly memberRoleRepository: IMemberRoleRepository,
     ) { }
 
     async execute(token: string, dto: AcceptInvitationDto): Promise<UserResponseDto> {
@@ -72,15 +72,20 @@ export class AcceptInvitationUseCase {
         const savedUser = await this.userRepository.create(user);
 
         // 5. Assign roles
+        // TODO: This needs to be updated to work with organization_members instead of users
+        // For now, keeping the old flow but using new repository names
+        // This will need comprehensive refactoring to create identity → organization_member → roles
         if (invitation.roleIds && invitation.roleIds.length > 0) {
-            const userRoles = invitation.roleIds.map(roleId =>
-                UserRole.create({
-                    userId: savedUser.id,
+            // NOTE: This is a temporary workaround - savedUser.id is still user.id, not organizationMemberId
+            // This use case needs to be refactored to create identity and organization member first
+            const memberRoles = invitation.roleIds.map(roleId =>
+                MemberRole.create({
+                    organizationMemberId: savedUser.id, // TODO: Replace with actual organizationMemberId
                     roleId,
                     assignedBy: invitation.invitedBy,
                 })
             );
-            await this.userRoleRepository.bulkCreate(userRoles);
+            await this.memberRoleRepository.bulkCreate(memberRoles);
         }
 
         // 6. Mark invitation as accepted

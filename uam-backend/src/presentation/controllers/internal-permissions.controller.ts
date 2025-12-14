@@ -60,9 +60,12 @@ export class InternalPermissionsController {
     }
 
     /**
-     * Helper to extract userId (subject) from the JWT access token.
+     * Helper to extract organizationMemberId (subject) from the JWT access token.
+     * 
+     * UPDATED: JWT sub is now organization_members.id (tenant-scoped), not user.id
+     * This represents the organization membership, which is the RBAC subject.
      */
-    private extractUserId(req: Request): string {
+    private extractOrganizationMemberId(req: Request): string {
         const authHeader = req.headers['authorization'] || req.headers['Authorization'];
         if (!authHeader || Array.isArray(authHeader)) {
             throw new UnauthorizedException('Missing Authorization header');
@@ -77,10 +80,10 @@ export class InternalPermissionsController {
         const payload: any = this.jwtService.decode(token);
 
         if (!payload?.sub) {
-            throw new UnauthorizedException('User ID not found in token');
+            throw new UnauthorizedException('Organization member ID not found in token');
         }
 
-        return payload.sub;
+        return payload.sub; // This is organization_members.id
     }
 
     /**
@@ -96,7 +99,7 @@ export class InternalPermissionsController {
     })
     async getUserProductMatrix(@Req() req: Request): Promise<UserProductPermissionsResponseDto> {
         const tenantId = this.extractTenantId(req);
-        const userId = this.extractUserId(req);
+        const organizationMemberId = this.extractOrganizationMemberId(req); // JWT sub = organization_members.id
 
         // Product scoping from header (REQUIRED for third-party backends)
         const productIdHeader = req.headers['x-product-id'];
@@ -122,9 +125,11 @@ export class InternalPermissionsController {
             throw new NotFoundException(`Product ${productId} not found for tenant`);
         }
 
-        // 3. Fetch aggregated feature permissions for this user
-        const userFeaturePerms = await this.getUserProductPermissionsUseCase.execute(tenantId, userId);
-        const permByFeatureId = new Map(userFeaturePerms.map(p => [p.featureId, p]));
+        // 3. Fetch aggregated feature permissions for this organization member
+        // UPDATED: Now uses organizationMemberId instead of userId
+        // RBAC subject is always organization_members.id, never identity.id
+        const memberFeaturePerms = await this.getUserProductPermissionsUseCase.execute(tenantId, organizationMemberId);
+        const permByFeatureId = new Map(memberFeaturePerms.map(p => [p.featureId, p]));
 
         // 4. Join features with permissions for this product only
         const products = [
@@ -149,7 +154,7 @@ export class InternalPermissionsController {
 
         return {
             tenantId,
-            userId,
+            userId: organizationMemberId, // Keep userId field for backward compatibility, but it's actually organizationMemberId
             products,
         };
     }

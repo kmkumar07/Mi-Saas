@@ -5,6 +5,11 @@ import { LoginUseCase } from '../../application/use-cases/auth/login.use-case';
 import { RefreshTokenUseCase } from '../../application/use-cases/auth/refresh-token.use-case';
 import { LogoutUseCase } from '../../application/use-cases/auth/logout.use-case';
 import { RegisterTenantUseCase } from '../../application/use-cases/auth/register-tenant.use-case';
+import { ResolveIdentityUseCase } from '../../application/use-cases/auth/resolve-identity.use-case';
+import { CheckMembershipUseCase } from '../../application/use-cases/authorization/check-membership.use-case';
+import { CheckProductAccessUseCase } from '../../application/use-cases/authorization/check-product-access.use-case';
+import { CheckOrgAdminUseCase } from '../../application/use-cases/authorization/check-org-admin.use-case';
+import { AuthorizationService } from '../../application/services/authorization.service';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { CreateUserUseCase } from '../../application/use-cases/users/create-user.use-case';
 import { TenantProvisioningClient } from '../../infrastructure/http/clients/tenant-provisioning.client';
@@ -24,12 +29,23 @@ import { TENANT_PROVISIONING_CLIENT } from '../../infrastructure/http/interfaces
         RefreshTokenUseCase,
         LogoutUseCase,
         RegisterTenantUseCase,
+        ResolveIdentityUseCase,
+        CheckMembershipUseCase,
+        CheckProductAccessUseCase,
+        CheckOrgAdminUseCase,
+        AuthorizationService,
         CreateUserUseCase,
         {
             provide: TENANT_PROVISIONING_CLIENT,
             useClass: TenantProvisioningClient,
         },
     ],
-    exports: [JwtModule],
+    exports: [
+        JwtModule,
+        CheckMembershipUseCase,
+        CheckProductAccessUseCase,
+        CheckOrgAdminUseCase,
+        AuthorizationService,
+    ],
 })
 export class AuthModule { }

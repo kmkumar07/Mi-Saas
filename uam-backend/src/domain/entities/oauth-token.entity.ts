@@ -1,6 +1,6 @@
 export interface OAuthTokenProps {
     id: string;
-    userId: string;
+    organizationMemberId: string; // UPDATED: Changed from userId to organizationMemberId
     accessToken: string;
     refreshToken?: string | null;
     tokenType: string;
@@ -36,8 +36,13 @@ export class OAuthToken {
         return this.props.id;
     }
 
+    get organizationMemberId(): string {
+        return this.props.organizationMemberId;
+    }
+
+    // Backward compatibility getter
     get userId(): string {
-        return this.props.userId;
+        return this.props.organizationMemberId;
     }
 
     get accessToken(): string {

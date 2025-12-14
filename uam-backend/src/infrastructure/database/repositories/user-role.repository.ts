@@ -1,65 +1,72 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and } from 'drizzle-orm';
-import { IUserRoleRepository } from '../../../domain/repositories/user-role.repository.interface';
-import { UserRole } from '../../../domain/entities/user-role.entity';
+import { IMemberRoleRepository } from '../../../domain/repositories/user-role.repository.interface';
+import { MemberRole } from '../../../domain/entities/user-role.entity';
 import * as schema from '../schema';
 import { DATABASE_CONNECTION } from '../database.provider';
 
+/**
+ * Member Role Repository Implementation
+ * RENAMED from UserRoleRepository to reflect new permission model
+ * 
+ * CRITICAL: RBAC subject is always organization_members.id, never identity.id
+ * This ensures RBAC is tenant-scoped and respects the membership requirement.
+ */
 @Injectable()
-export class UserRoleRepository implements IUserRoleRepository {
+export class MemberRoleRepository implements IMemberRoleRepository {
     constructor(
         @Inject(DATABASE_CONNECTION)
         private readonly db: PostgresJsDatabase<typeof schema>,
     ) { }
 
-    async findById(id: string): Promise<UserRole | null> {
+    async findById(id: string): Promise<MemberRole | null> {
         const result = await this.db
             .select()
-            .from(schema.userRoles)
-            .where(eq(schema.userRoles.id, id))
+            .from(schema.memberRoles)
+            .where(eq(schema.memberRoles.id, id))
             .limit(1);
         return result.length > 0 ? this.toDomain(result[0]) : null;
     }
 
-    async findByUserId(userId: string): Promise<UserRole[]> {
+    async findByOrganizationMemberId(organizationMemberId: string): Promise<MemberRole[]> {
         const results = await this.db
             .select()
-            .from(schema.userRoles)
-            .where(eq(schema.userRoles.userId, userId));
+            .from(schema.memberRoles)
+            .where(eq(schema.memberRoles.organizationMemberId, organizationMemberId));
         return results.map(row => this.toDomain(row));
     }
 
-    async findByUserIdAndRoleId(userId: string, roleId: string): Promise<UserRole | null> {
+    async findByOrganizationMemberIdAndRoleId(organizationMemberId: string, roleId: string): Promise<MemberRole | null> {
         const result = await this.db
             .select()
-            .from(schema.userRoles)
+            .from(schema.memberRoles)
             .where(
                 and(
-                    eq(schema.userRoles.userId, userId),
-                    eq(schema.userRoles.roleId, roleId)
+                    eq(schema.memberRoles.organizationMemberId, organizationMemberId),
+                    eq(schema.memberRoles.roleId, roleId)
                 )
             )
             .limit(1);
         return result.length > 0 ? this.toDomain(result[0]) : null;
     }
 
-    async create(userRole: UserRole): Promise<UserRole> {
-        const persistence = userRole.toPersistence();
+    async create(memberRole: MemberRole): Promise<MemberRole> {
+        const persistence = memberRole.toPersistence();
         const result = await this.db
-            .insert(schema.userRoles)
+            .insert(schema.memberRoles)
             .values(persistence as any)
             .returning();
         return this.toDomain(result[0]);
     }
 
-    async bulkCreate(userRoles: UserRole[]): Promise<UserRole[]> {
-        if (userRoles.length === 0) {
+    async bulkCreate(memberRoles: MemberRole[]): Promise<MemberRole[]> {
+        if (memberRoles.length === 0) {
             return [];
         }
-        const persistenceData = userRoles.map(ur => ur.toPersistence());
+        const persistenceData = memberRoles.map(mr => mr.toPersistence());
         const results = await this.db
-            .insert(schema.userRoles)
+            .insert(schema.memberRoles)
             .values(persistenceData as any)
             .returning();
         return results.map(row => this.toDomain(row));
@@ -67,25 +74,25 @@ export class UserRoleRepository implements IUserRoleRepository {
 
     async delete(id: string): Promise<void> {
         await this.db
-            .delete(schema.userRoles)
-            .where(eq(schema.userRoles.id, id));
+            .delete(schema.memberRoles)
+            .where(eq(schema.memberRoles.id, id));
     }
 
-    async deleteByUserIdAndRoleId(userId: string, roleId: string): Promise<void> {
+    async deleteByOrganizationMemberIdAndRoleId(organizationMemberId: string, roleId: string): Promise<void> {
         await this.db
-            .delete(schema.userRoles)
+            .delete(schema.memberRoles)
             .where(
                 and(
-                    eq(schema.userRoles.userId, userId),
-                    eq(schema.userRoles.roleId, roleId)
+                    eq(schema.memberRoles.organizationMemberId, organizationMemberId),
+                    eq(schema.memberRoles.roleId, roleId)
                 )
             );
     }
 
-    private toDomain(row: typeof schema.userRoles.$inferSelect): UserRole {
-        return UserRole.fromPersistence({
+    private toDomain(row: typeof schema.memberRoles.$inferSelect): MemberRole {
+        return MemberRole.fromPersistence({
             id: row.id,
-            userId: row.userId,
+            organizationMemberId: row.organizationMemberId,
             roleId: row.roleId,
             productId: row.productId,
             assignedBy: row.assignedBy,
