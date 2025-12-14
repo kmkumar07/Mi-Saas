@@ -15,6 +15,13 @@
       "when": 1765312465833,
       "tag": "0001_mean_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1765732937197,
+      "tag": "0002_common_alice",
+      "breakpoints": true
     }
   ]
 }
