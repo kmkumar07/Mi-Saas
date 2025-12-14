@@ -7,6 +7,7 @@ import { RolesModule } from './presentation/modules/roles.module';
 import { PermissionsModule } from './presentation/modules/permissions.module';
 import { InvitationsModule } from './presentation/modules/invitations.module';
 import { TenantActivationModule } from './presentation/modules/tenant-activation.module';
+import { OAuth2Module } from './presentation/modules/oauth2.module';
 
 @Module({
     imports: [
@@ -21,6 +22,7 @@ import { TenantActivationModule } from './presentation/modules/tenant-activation
         PermissionsModule,
         InvitationsModule,
         TenantActivationModule,
+        OAuth2Module,
     ],
     controllers: [],
     providers: [],

@@ -12,6 +12,8 @@ import { EmployeeInvitationRepository } from './repositories/employee-invitation
 import { RolePermissionRepository } from './repositories/role-permission.repository';
 import { OAuthTokenRepository } from './repositories/oauth-token.repository';
 import { AuditLogRepository } from './repositories/audit-log.repository';
+import { OAuthClientRepository } from './repositories/oauth-client.repository';
+import { OAuthAuthorizationCodeRepository } from './repositories/oauth-authorization-code.repository';
 
 /**
  * Database Module
@@ -70,6 +72,14 @@ import { AuditLogRepository } from './repositories/audit-log.repository';
             provide: 'IAuditLogRepository',
             useClass: AuditLogRepository,
         },
+        {
+            provide: 'IOAuthClientRepository',
+            useClass: OAuthClientRepository,
+        },
+        {
+            provide: 'IOAuthAuthorizationCodeRepository',
+            useClass: OAuthAuthorizationCodeRepository,
+        },
     ],
     exports: [
         ...databaseProviders,
@@ -85,6 +95,8 @@ import { AuditLogRepository } from './repositories/audit-log.repository';
         'IRolePermissionRepository',
         'IOAuthTokenRepository',
         'IAuditLogRepository',
+        'IOAuthClientRepository',
+        'IOAuthAuthorizationCodeRepository',
     ],
 })
 export class DatabaseModule { }

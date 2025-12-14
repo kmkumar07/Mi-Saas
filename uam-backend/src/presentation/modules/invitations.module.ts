@@ -6,9 +6,11 @@ import { SendInvitationUseCase } from '../../application/use-cases/invitations/s
 import { AcceptInvitationUseCase } from '../../application/use-cases/invitations/accept-invitation.use-case';
 import { RevokeInvitationUseCase } from '../../application/use-cases/invitations/revoke-invitation.use-case';
 import { AdminActivateInvitationUseCase } from '../../application/use-cases/invitations/admin-activate-invitation.use-case';
+import { AuthModule } from './auth.module';
 
 @Module({
     imports: [
+        AuthModule, // Import AuthModule to access CreateIdentityWithMembershipUseCase
         JwtModule.register({
             secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
             signOptions: { expiresIn: '15m' },

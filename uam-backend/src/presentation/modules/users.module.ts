@@ -9,10 +9,12 @@ import { AssignRoleToUserUseCase } from '../../application/use-cases/users/assig
 import { RemoveRoleFromUserUseCase } from '../../application/use-cases/users/remove-role-from-user.use-case';
 import { BulkAssignRolesUseCase } from '../../application/use-cases/users/bulk-assign-roles.use-case';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { AuthModule } from './auth.module';
 
 @Module({
     imports: [
         DatabaseModule,
+        AuthModule, // Import AuthModule to access CreateIdentityWithMembershipUseCase
         JwtModule.register({
             secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
         }),

@@ -360,6 +360,54 @@ export const oauthTokens = uamSchema.table(
     })
 );
 
+/**
+ * OAuth2 Clients Table
+ * Stores OAuth2 client applications that can request authorization
+ */
+export const oauthClients = uamSchema.table(
+    'oauth_clients',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        clientId: varchar('client_id', { length: 255 }).unique().notNull(),
+        clientSecretHash: varchar('client_secret_hash', { length: 255 }).notNull(),
+        name: varchar('name', { length: 255 }).notNull(),
+        redirectUris: text('redirect_uris').array().notNull(), // Array of redirect URIs
+        scopes: text('scopes').array().notNull(), // Array of allowed scopes
+        grantTypes: text('grant_types').array().notNull(), // Array of grant types (authorization_code, client_credentials, refresh_token)
+        tenantId: uuid('tenant_id').notNull(), // FK to subscription.tenants (cross-schema)
+        isActive: boolean('is_active').default(true).notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        clientIdIdx: index('idx_oauth_clients_client_id').on(table.clientId),
+        tenantIdx: index('idx_oauth_clients_tenant').on(table.tenantId),
+    })
+);
+
+/**
+ * OAuth2 Authorization Codes Table
+ * Stores temporary authorization codes for authorization code flow
+ */
+export const oauthAuthorizationCodes = uamSchema.table(
+    'oauth_authorization_codes',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        code: varchar('code', { length: 255 }).unique().notNull(),
+        clientId: varchar('client_id', { length: 255 }).notNull(),
+        organizationMemberId: uuid('organization_member_id').notNull().references(() => organizationMembers.id, { onDelete: 'cascade' }),
+        redirectUri: varchar('redirect_uri', { length: 500 }).notNull(),
+        scopes: text('scopes').array().notNull(), // Array of requested scopes
+        expiresAt: timestamp('expires_at').notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        codeIdx: index('idx_oauth_auth_codes_code').on(table.code),
+        clientIdx: index('idx_oauth_auth_codes_client').on(table.clientId),
+        memberIdx: index('idx_oauth_auth_codes_member').on(table.organizationMemberId),
+    })
+);
+
 // ============================
 // TYPE EXPORTS
 // ============================
@@ -399,3 +447,9 @@ export type NewAuditLog = typeof auditLogs.$inferInsert;
 
 export type OAuthToken = typeof oauthTokens.$inferSelect;
 export type NewOAuthToken = typeof oauthTokens.$inferInsert;
+
+export type OAuthClient = typeof oauthClients.$inferSelect;
+export type NewOAuthClient = typeof oauthClients.$inferInsert;
+
+export type OAuthAuthorizationCode = typeof oauthAuthorizationCodes.$inferSelect;
+export type NewOAuthAuthorizationCode = typeof oauthAuthorizationCodes.$inferInsert;

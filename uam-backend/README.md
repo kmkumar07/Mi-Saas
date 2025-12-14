@@ -128,31 +128,38 @@ The API will be available at:
 - ✅ Repository pattern with interfaces
 - ✅ Multi-tenancy support
 - ✅ Database schema with Drizzle ORM
-
-### 🚧 In Progress
-- 🚧 OAuth2 authentication
-- 🚧 RBAC implementation
-- 🚧 Employee invitation workflow
-- 🚧 REST API controllers
-- 🚧 Permission checking
+- ✅ **OAuth2/OIDC Identity Provider** - Full authorization server
+- ✅ **Identity Chain Management** - Identity → AuthenticationAccount → OrganizationMember
+- ✅ **Tenant Registration** - Complete tenant and admin user creation
+- ✅ **JWT Authentication** - Token-based authentication with refresh tokens
+- ✅ **RBAC Implementation** - Role-based access control
+- ✅ **Employee Invitation Workflow** - Invite and onboard employees
+- ✅ **REST API Controllers** - Complete API surface
+- ✅ **Permission Checking** - Fine-grained permission system
 
 ### 📅 Planned
-- 📅 Azure AD integration
-- 📅 Account types (Individual/Company)
+- 📅 Azure AD integration (schema supports it)
 - 📅 Email service integration
-- 📅 Audit logging
 - 📅 Rate limiting
+- 📅 JWKS endpoint for ID token signing
 
 ## 🗄️ Database Schema
 
 ### UAM Schema Tables
-1. **users** - User accounts with authentication
-2. **system_roles** - Predefined and custom roles
-3. **user_roles** - User-role assignments
-4. **role_permissions** - Role-feature permissions
-5. **employee_invitations** - Invitation workflow
-6. **audit_logs** - Audit trail
-7. **oauth_tokens** - OAuth2 tokens
+1. **identities** - Global human identities (across all tenants)
+2. **authentication_accounts** - Login methods per identity
+3. **organization_members** - Tenant membership (baseline for all access)
+4. **organization_admins** - Tenant-level administrative authority
+5. **users** - User accounts (backward compatibility)
+6. **system_roles** - Predefined and custom roles
+7. **member_roles** - Organization member-role assignments
+8. **role_permissions** - Role-feature permissions
+9. **product_access_grants** - Product access grants
+10. **employee_invitations** - Invitation workflow
+11. **audit_logs** - Audit trail
+12. **oauth_tokens** - OAuth2 access and refresh tokens
+13. **oauth_clients** - OAuth2 client applications
+14. **oauth_authorization_codes** - Temporary authorization codes
 
 ### System Roles
 - `super_admin` (Level 1) - Platform-wide access
@@ -165,19 +172,37 @@ The API will be available at:
 - **Password Hashing**: bcrypt with 12 salt rounds
 - **JWT Tokens**: 15-minute access tokens, 7-day refresh tokens
 - **Multi-Tenancy**: Row-level security with tenant isolation
-- **CORS**: Configured for frontend origin
+- **CORS**: Configurable origins (defaults to allow all in dev)
 - **Validation**: Global validation pipe with class-validator
+- **OAuth2 Client Secrets**: Hashed with bcrypt
+- **Authorization Codes**: Single-use, 10-minute expiry
+- **HttpOnly Cookies**: Prevents XSS attacks
+- **Token Revocation**: Support for token revocation
 
 ## 📚 API Documentation
 
 Access Swagger documentation at `/api` endpoint when the server is running.
 
-### Main Endpoints (Planned)
+### Quick Start Guide
+
+**📖 For detailed IdP, registration, and login instructions, see [IDP_GUIDE.md](./IDP_GUIDE.md)**
+
+### Main Endpoints
 
 #### Authentication
-- `POST /api/auth/login` - User login
+- `POST /api/auth/register-tenant` - Register new tenant and admin user
+- `POST /api/auth/login` - User login (requires tenantId)
 - `POST /api/auth/refresh` - Refresh access token
 - `POST /api/auth/logout` - User logout
+- `GET /api/auth/me` - Get current authenticated user
+
+#### OAuth2/OIDC
+- `GET /oauth2/authorize` - OAuth2 authorization endpoint
+- `POST /oauth2/token` - OAuth2 token endpoint
+- `GET /oauth2/userinfo` - OpenID Connect user info
+- `GET /.well-known/openid-configuration` - OIDC discovery
+- `POST /oauth2/clients` - Register OAuth2 client (admin only)
+- `GET /oauth2/clients` - List OAuth2 clients (admin only)
 
 #### Users
 - `GET /api/users` - List users (tenant-scoped)

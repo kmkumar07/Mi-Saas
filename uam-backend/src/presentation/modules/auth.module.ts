@@ -6,6 +6,7 @@ import { RefreshTokenUseCase } from '../../application/use-cases/auth/refresh-to
 import { LogoutUseCase } from '../../application/use-cases/auth/logout.use-case';
 import { RegisterTenantUseCase } from '../../application/use-cases/auth/register-tenant.use-case';
 import { ResolveIdentityUseCase } from '../../application/use-cases/auth/resolve-identity.use-case';
+import { CreateIdentityWithMembershipUseCase } from '../../application/use-cases/auth/create-identity-with-membership.use-case';
 import { CheckMembershipUseCase } from '../../application/use-cases/authorization/check-membership.use-case';
 import { CheckProductAccessUseCase } from '../../application/use-cases/authorization/check-product-access.use-case';
 import { CheckOrgAdminUseCase } from '../../application/use-cases/authorization/check-org-admin.use-case';
@@ -30,6 +31,7 @@ import { TENANT_PROVISIONING_CLIENT } from '../../infrastructure/http/interfaces
         LogoutUseCase,
         RegisterTenantUseCase,
         ResolveIdentityUseCase,
+        CreateIdentityWithMembershipUseCase,
         CheckMembershipUseCase,
         CheckProductAccessUseCase,
         CheckOrgAdminUseCase,
@@ -46,6 +48,7 @@ import { TENANT_PROVISIONING_CLIENT } from '../../infrastructure/http/interfaces
         CheckProductAccessUseCase,
         CheckOrgAdminUseCase,
         AuthorizationService,
+        CreateIdentityWithMembershipUseCase,
     ],
 })
 export class AuthModule { }
